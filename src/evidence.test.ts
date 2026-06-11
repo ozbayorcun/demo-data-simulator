@@ -55,6 +55,25 @@ describe("collectEvidence", () => {
     expect(result.files.map((file) => file.path)).toEqual(["src/task-models.ts"]);
   });
 
+  it("prioritizes app contracts over broad api routes when budget is tight", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "dds-evidence-contracts-"));
+    await mkdir(path.join(root, "src", "shared", "contracts"), { recursive: true });
+    await mkdir(path.join(root, "web", "src", "app", "api", "billing", "route"), { recursive: true });
+    await writeFile(
+      path.join(root, "src", "shared", "contracts", "task.ts"),
+      "export interface TaskContract { id: string; status: string }",
+      "utf8",
+    );
+    await writeFile(
+      path.join(root, "web", "src", "app", "api", "billing", "route", "route.ts"),
+      "export async function GET() { return Response.json({ ok: true }) }",
+      "utf8",
+    );
+
+    const result = await collectEvidence({ projectRoot: root, maxFiles: 1 });
+    expect(result.files.map((file) => file.path)).toEqual(["src/shared/contracts/task.ts"]);
+  });
+
   it("uses fast profile limits when raw limits are not provided", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "dds-evidence-fast-"));
     await mkdir(path.join(root, "src"));

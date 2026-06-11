@@ -180,6 +180,12 @@ MVP specs are JSON only and use `schemaVersion: "simulator.v1"`. A spec defines 
 
 See `examples/specs/field-service.simulator.spec.json`.
 
+## Dogfood Notes
+
+The first real dogfood pass ran against a private mixed desktop/web task workflow app and generated linked identity, license, capture, candidate-task, stored-task, event, and metric data.
+
+See [Task Workflow Dogfood](https://github.com/ozbayorcun/demo-data-simulator/blob/main/docs/TASK-WORKFLOW-DOGFOOD.md).
+
 ## When Not To Use It
 
 This is not the best tool for:

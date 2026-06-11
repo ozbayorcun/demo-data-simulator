@@ -1,4 +1,4 @@
-import type { EventSpec, FieldType, SimulatorSpec } from "./types.js";
+import type { EventSpec, FieldSpec, FieldType, SimulatorSpec } from "./types.js";
 
 export interface ValidationResult {
   ok: boolean;
@@ -26,100 +26,94 @@ export function normalizeSpec(spec: SimulatorSpec): SimulatorSpec {
 
       return {
         ...entity,
-        fields: fields.map((field) => {
-        const lowerFieldType = normalizedTypeName(field.type);
-        if ((lowerFieldType === "id" || lowerFieldType === "string" || lowerFieldType === "uuid") && (field.name.toLowerCase() === "id" || field.name === primaryIdField)) {
-          return { ...field, type: "id" };
-        }
-        if (["string", "integer", "number", "boolean", "enum"].includes(lowerFieldType)) {
-          return { ...field, type: lowerFieldType as FieldType };
-        }
-        if (lowerFieldType === "timestamp" || lowerFieldType === "datetime" || lowerFieldType === "date") {
-          return { ...field, type: "timestamp" };
-        }
-        if (lowerFieldType === "array_foreign_key" || lowerFieldType === "array_reference") {
-          return { ...field, type: "string" };
-        }
-        if (lowerFieldType === "foreign_key" || lowerFieldType === "reference" || lowerFieldType === "ref") {
-          const relationship = relationships.find(
-            (candidate) => candidate.from === entity.name && candidate.field === field.name,
-          );
-          return { ...field, type: relationship ? `ref:${relationship.to}` : "string" };
-        }
-        if (lowerFieldType === "uuid" && /id$/i.test(field.name)) {
-          const relationship = relationships.find(
-            (candidate) => candidate.from === entity.name && candidate.field === field.name,
-          );
-          return { ...field, type: relationship ? `ref:${relationship.to}` : "string" };
-        }
-        if (lowerFieldType.startsWith("array_") || lowerFieldType.startsWith("array<") || lowerFieldType.endsWith("_array")) {
-          return { ...field, type: "string" };
-        }
-        if (
-          lowerFieldType === "email" ||
-          lowerFieldType === "url" ||
-          lowerFieldType === "text" ||
-          lowerFieldType === "uuid" ||
-          lowerFieldType === "person_name" ||
-          lowerFieldType === "company_name" ||
-          lowerFieldType === "task_title" ||
-          lowerFieldType === "paragraph"
-        ) {
-          return { ...field, type: "string" };
-        }
-        return field;
-      }),
+        fields: fields.map((field) => normalizeField(field, relationships, entity.name, primaryIdField)),
       };
     }),
     events: spec.events.map((event) => ({
       ...event,
-      fields: event.fields?.map((field) => {
-        const lowerFieldType = normalizedTypeName(field.type);
-        if (["string", "integer", "number", "boolean", "enum"].includes(lowerFieldType)) {
-          return { ...field, type: lowerFieldType as FieldType };
-        }
-        if (lowerFieldType === "timestamp" || lowerFieldType === "datetime" || lowerFieldType === "date") {
-          return { ...field, type: "timestamp" };
-        }
-        if (lowerFieldType === "array_foreign_key" || lowerFieldType === "array_reference") {
-          return { ...field, type: "string" };
-        }
-        if (lowerFieldType === "foreign_key" || lowerFieldType === "reference" || lowerFieldType === "ref") {
-          const relationship = relationships.find(
-            (candidate) => candidate.from === event.sourceEntity && candidate.field === field.name,
-          );
-          return { ...field, type: relationship ? `ref:${relationship.to}` : "string" };
-        }
-        if (lowerFieldType === "uuid" && /id$/i.test(field.name)) {
-          const relationship = relationships.find(
-            (candidate) => candidate.from === event.sourceEntity && candidate.field === field.name,
-          );
-          return { ...field, type: relationship ? `ref:${relationship.to}` : "string" };
-        }
-        if (lowerFieldType.startsWith("array_") || lowerFieldType.startsWith("array<") || lowerFieldType.endsWith("_array")) {
-          return { ...field, type: "string" };
-        }
-        if (
-          lowerFieldType === "email" ||
-          lowerFieldType === "url" ||
-          lowerFieldType === "text" ||
-          lowerFieldType === "uuid" ||
-          lowerFieldType === "person_name" ||
-          lowerFieldType === "company_name" ||
-          lowerFieldType === "task_title" ||
-          lowerFieldType === "paragraph"
-        ) {
-          return { ...field, type: "string" };
-        }
-        return field;
-      }),
+      dependsOn: event.dependsOn?.filter((dependency) => eventNames.has(dependency)),
+      fields: event.fields?.map((field) => normalizeField(field, relationships, event.sourceEntity)),
     })),
   };
+}
+
+function normalizeField(
+  rawField: FieldSpec,
+  relationships: NonNullable<SimulatorSpec["relationships"]>,
+  sourceEntity: string,
+  primaryIdField?: string,
+): FieldSpec {
+  const field = cleanField(rawField);
+  const lowerFieldType = normalizedTypeName(field.type);
+
+  if (
+    (lowerFieldType === "id" || lowerFieldType === "string" || lowerFieldType === "uuid") &&
+    (field.name.toLowerCase() === "id" || field.name === primaryIdField)
+  ) {
+    return { ...field, type: "id" };
+  }
+  if (["string", "integer", "number", "boolean", "enum"].includes(lowerFieldType)) {
+    return { ...field, type: lowerFieldType as FieldType };
+  }
+  if (lowerFieldType === "timestamp" || lowerFieldType === "datetime" || lowerFieldType === "date") {
+    return { ...field, type: "timestamp" };
+  }
+  if (lowerFieldType === "array_foreign_key" || lowerFieldType === "array_reference") {
+    return { ...field, type: "string" };
+  }
+  if (lowerFieldType === "foreign_key" || lowerFieldType === "reference" || lowerFieldType === "ref") {
+    const relationship = relationships.find(
+      (candidate) => candidate.from === sourceEntity && candidate.field === field.name,
+    );
+    return { ...field, type: relationship ? `ref:${relationship.to}` : "string" };
+  }
+  if (lowerFieldType === "uuid" && /id$/i.test(field.name)) {
+    const relationship = relationships.find(
+      (candidate) => candidate.from === sourceEntity && candidate.field === field.name,
+    );
+    return { ...field, type: relationship ? `ref:${relationship.to}` : "string" };
+  }
+  if (lowerFieldType.startsWith("array_") || lowerFieldType.startsWith("array<") || lowerFieldType.endsWith("_array")) {
+    return { ...field, type: "string" };
+  }
+  if (isStringLikeType(lowerFieldType)) {
+    return { ...field, type: "string" };
+  }
+  return field;
+}
+
+function isStringLikeType(lowerFieldType: string): boolean {
+  return [
+    "email",
+    "url",
+    "text",
+    "json",
+    "version",
+    "semver",
+    "semver_or_current",
+    "currency",
+    "date_string",
+    "url_path",
+    "uuid",
+    "person_name",
+    "company_name",
+    "task_title",
+    "paragraph",
+  ].includes(lowerFieldType);
+}
+
+function cleanField(field: FieldSpec): FieldSpec {
+  const cleaned: FieldSpec & { min?: number | null; max?: number | null; values?: string[] | null } = { ...field };
+  if (cleaned.min === null) delete cleaned.min;
+  if (cleaned.max === null) delete cleaned.max;
+  if (cleaned.values === null) delete cleaned.values;
+  return cleaned;
 }
 
 function normalizedTypeName(value: unknown): string {
   return String(value)
     .toLowerCase()
+    .replace(/\s*\|\s*null$/, "")
     .replace(/_optional$/, "")
     .replace(/_nullable$/, "")
     .replace(/ optional$/, "")

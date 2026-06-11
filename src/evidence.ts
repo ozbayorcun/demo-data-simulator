@@ -258,6 +258,10 @@ function scoreEvidencePath(relativePath: string, reason: string): number {
   if (pathLower.includes("/app/") || pathLower.startsWith("app/")) score += 18;
   if (pathLower.includes("/lib/") || pathLower.startsWith("lib/")) score += 12;
   if (pathLower.includes("/components/")) score += 5;
+  if (pathLower.includes("/src/shared/contracts/") || pathLower.startsWith("src/shared/contracts/")) score += 70;
+  if (pathLower.includes("/test/contracts/") || pathLower.startsWith("test/contracts/")) score += 45;
+  if (pathLower.includes("/src/renderer/") || pathLower.startsWith("src/renderer/")) score += 28;
+  if (pathLower.includes("/src/main/") || pathLower.startsWith("src/main/")) score += 18;
 
   if (reason === "schema or model") score += 55;
   if (reason === "domain logic") score += 45;
@@ -266,7 +270,7 @@ function scoreEvidencePath(relativePath: string, reason: string): number {
   if (reason === "readme") score += 18;
 
   if (/model|schema|entity|entities|type|types|database|prisma|migration/.test(pathLower)) score += 25;
-  if (/task|order|customer|user|account|billing|job|event|workflow|capture|candidate|game|asset/.test(pathLower)) score += 16;
+  if (/task|order|customer|user|account|billing|job|event|workflow|capture|candidate|game|asset|meeting|suggestion|insight|desktop|renderer|contract/.test(pathLower)) score += 16;
   if (/route|api|controller|service|store|repository|mutation|query/.test(pathLower)) score += 14;
   if (/fixture|seed|example|mock/.test(pathLower)) score += 10;
 

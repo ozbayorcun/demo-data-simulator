@@ -135,4 +135,33 @@ describe("normalizeSpec", () => {
     expect(normalized.entities[0].fields[5].type).toBe("timestamp");
     expect(normalized.entities[0].fields[6].type).toBe("string");
   });
+
+  it("cleans common agent dialect drift before validation", () => {
+    const normalized = normalizeSpec({
+      ...validSpec,
+      entities: [
+        {
+          name: "Release",
+          count: 3,
+          fields: [
+            { name: "id", type: "uuid" },
+            { name: "version", type: "semver_or_current", min: null, max: null, values: null },
+            { name: "optionalOwner", type: "string|null" },
+            { name: "lastSeenAt", type: "datetime | null" },
+          ],
+        },
+      ],
+      events: [
+        { name: "release_created", sourceEntity: "Release", dependsOn: ["Release"] },
+        { name: "release_checked", sourceEntity: "Release", dependsOn: ["release_created", "Release"] },
+      ],
+    } as unknown as SimulatorSpec);
+
+    expect(normalized.entities[0].fields[1]).toEqual({ name: "version", type: "string" });
+    expect(normalized.entities[0].fields[2].type).toBe("string");
+    expect(normalized.entities[0].fields[3].type).toBe("timestamp");
+    expect(normalized.events[0].dependsOn).toEqual([]);
+    expect(normalized.events[1].dependsOn).toEqual(["release_created"]);
+    expect(validateSpec(normalized).ok).toBe(true);
+  });
 });
