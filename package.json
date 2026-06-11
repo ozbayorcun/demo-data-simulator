@@ -1,0 +1,39 @@
+{
+  "name": "demo-data-simulator",
+  "version": "0.1.0",
+  "description": "Agent-inferred demo data for business workflow apps.",
+  "type": "module",
+  "bin": {
+    "demo-data-simulator": "./dist/cli.js",
+    "dds": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "docs",
+    "examples/specs"
+  ],
+  "scripts": {
+    "build": "node scripts/clean-dist.mjs && tsc && node scripts/mark-cli-executable.mjs",
+    "check": "npm run build && npm test",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "demo-data",
+    "test-data",
+    "agent",
+    "simulation",
+    "cli"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
+}

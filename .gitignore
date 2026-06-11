@@ -1,0 +1,7 @@
+node_modules/
+dist/
+coverage/
+.demo-data-simulator/
+demo-data/
+*.tgz
+
