@@ -6,6 +6,7 @@ import { collectEvidence } from "./evidence.js";
 import { writeJson, writeText } from "./fs-utils.js";
 import { normalizeSpec, validateSpec } from "./spec.js";
 import type { AgentName } from "./agent.js";
+import type { EvidenceProfile } from "./evidence.js";
 import type { InferenceEnvelope } from "./types.js";
 
 export interface InferOptions {
@@ -17,6 +18,7 @@ export interface InferOptions {
   exclude?: string[];
   maxFiles?: number;
   maxBytes?: number;
+  evidenceProfile?: EvidenceProfile;
   acceptGenerated?: boolean;
 }
 
@@ -29,6 +31,7 @@ export async function inferSpec(options: InferOptions): Promise<InferenceEnvelop
     exclude: options.exclude,
     maxFiles: options.maxFiles,
     maxBytes: options.maxBytes,
+    profile: options.evidenceProfile,
   });
 
   if (options.agent === "none") {

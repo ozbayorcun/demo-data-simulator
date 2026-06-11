@@ -9,6 +9,7 @@ export interface CollectEvidenceOptions {
   exclude?: string[];
   maxFiles?: number;
   maxBytes?: number;
+  profile?: EvidenceProfile;
 }
 
 export interface EvidenceBundle {
@@ -16,8 +17,18 @@ export interface EvidenceBundle {
   manifest: EvidenceManifest;
 }
 
-const DEFAULT_MAX_FILES = 80;
-const DEFAULT_MAX_BYTES = 160_000;
+export type EvidenceProfile = "fast" | "balanced" | "wide";
+
+const PROFILE_LIMITS: Record<EvidenceProfile, { maxFiles: number; maxBytes: number }> = {
+  fast: { maxFiles: 35, maxBytes: 80_000 },
+  balanced: { maxFiles: 80, maxBytes: 160_000 },
+  wide: { maxFiles: 140, maxBytes: 280_000 },
+};
+
+export function isEvidenceProfile(value: string): value is EvidenceProfile {
+  return value === "fast" || value === "balanced" || value === "wide";
+}
+
 const MAX_FILE_BYTES = 24_000;
 
 const ALLOWED_EXTENSIONS = new Set([
@@ -70,13 +81,14 @@ const SECRET_FILE_PATTERNS = [
 export async function collectEvidence(options: CollectEvidenceOptions): Promise<EvidenceBundle> {
   const projectRoot = path.resolve(options.projectRoot);
   const gitignore = await readGitignore(projectRoot);
-  const maxFiles = options.maxFiles ?? DEFAULT_MAX_FILES;
-  const maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES;
+  const profile = options.profile ?? "balanced";
+  const maxFiles = options.maxFiles ?? PROFILE_LIMITS[profile].maxFiles;
+  const maxBytes = options.maxBytes ?? PROFILE_LIMITS[profile].maxBytes;
   const files: EvidenceFile[] = [];
   const skipped: Array<{ path: string; reason: string }> = [];
+  const candidates: Array<{ absolutePath: string; path: string; bytes: number; reason: string; score: number }> = [];
 
   const visit = async (absolutePath: string): Promise<void> => {
-    if (files.length >= maxFiles) return;
     const relative = toPosixPath(path.relative(projectRoot, absolutePath));
     if (!relative) {
       for (const entry of await sortedEntries(absolutePath)) {
@@ -126,28 +138,48 @@ export async function collectEvidence(options: CollectEvidenceOptions): Promise<
       skipped.push({ path: relative, reason: "file too large" });
       return;
     }
-    const currentBytes = files.reduce((sum, file) => sum + file.bytes, 0);
-    if (currentBytes + stat.size > maxBytes) {
-      skipped.push({ path: relative, reason: "evidence byte budget reached" });
-      return;
-    }
-    const raw = await readFile(absolutePath);
-    if (raw.includes(0)) {
-      skipped.push({ path: relative, reason: "binary content" });
-      return;
-    }
-    const text = raw.toString("utf8");
-    const redacted = redactSecrets(text);
-    files.push({
+    const reason = inferReason(relative);
+    candidates.push({
+      absolutePath,
       path: relative,
-      bytes: Buffer.byteLength(redacted.content, "utf8"),
-      redactions: redacted.count,
-      reason: inferReason(relative),
-      content: redacted.content,
+      bytes: stat.size,
+      reason,
+      score: scoreEvidencePath(relative, reason),
     });
   };
 
   await visit(projectRoot);
+
+  const rankedCandidates = candidates.sort((left, right) => {
+    if (right.score !== left.score) return right.score - left.score;
+    return left.path.localeCompare(right.path);
+  });
+
+  for (const candidate of rankedCandidates) {
+    if (files.length >= maxFiles) {
+      skipped.push({ path: candidate.path, reason: "evidence file budget reached" });
+      continue;
+    }
+    const currentBytes = files.reduce((sum, file) => sum + file.bytes, 0);
+    if (currentBytes + candidate.bytes > maxBytes) {
+      skipped.push({ path: candidate.path, reason: "evidence byte budget reached" });
+      continue;
+    }
+    const raw = await readFile(candidate.absolutePath);
+    if (raw.includes(0)) {
+      skipped.push({ path: candidate.path, reason: "binary content" });
+      continue;
+    }
+    const text = raw.toString("utf8");
+    const redacted = redactSecrets(text);
+    files.push({
+      path: candidate.path,
+      bytes: Buffer.byteLength(redacted.content, "utf8"),
+      redactions: redacted.count,
+      reason: candidate.reason,
+      content: redacted.content,
+    });
+  }
 
   const manifest: EvidenceManifest = {
     projectRoot,
@@ -192,10 +224,42 @@ export function redactSecrets(input: string): { content: string; count: number }
 function inferReason(relativePath: string): string {
   const base = path.basename(relativePath).toLowerCase();
   if (base.includes("readme")) return "readme";
+  if (relativePath.includes("prisma") || relativePath.includes("migration") || relativePath.includes("database")) return "schema or model";
   if (relativePath.includes("schema") || relativePath.includes("model")) return "schema or model";
+  if (relativePath.includes("types") || relativePath.includes("entities")) return "schema or model";
   if (relativePath.includes("route") || relativePath.includes("api")) return "api surface";
+  if (relativePath.includes("store") || relativePath.includes("service") || relativePath.includes("workflow")) return "domain logic";
   if (relativePath.includes("test") || relativePath.includes("spec")) return "test or fixture";
   return "allowlisted source";
+}
+
+function scoreEvidencePath(relativePath: string, reason: string): number {
+  const pathLower = relativePath.toLowerCase();
+  const base = path.basename(pathLower);
+  let score = 10;
+
+  if (pathLower.includes("/src/") || pathLower.startsWith("src/")) score += 30;
+  if (pathLower.includes("/app/") || pathLower.startsWith("app/")) score += 18;
+  if (pathLower.includes("/lib/") || pathLower.startsWith("lib/")) score += 12;
+  if (pathLower.includes("/components/")) score += 5;
+
+  if (reason === "schema or model") score += 55;
+  if (reason === "domain logic") score += 45;
+  if (reason === "api surface") score += 35;
+  if (reason === "test or fixture") score += 20;
+  if (reason === "readme") score += 18;
+
+  if (/model|schema|entity|entities|type|types|database|prisma|migration/.test(pathLower)) score += 25;
+  if (/task|order|customer|user|account|billing|job|event|workflow|capture|candidate|game|asset/.test(pathLower)) score += 16;
+  if (/route|api|controller|service|store|repository|mutation|query/.test(pathLower)) score += 14;
+  if (/fixture|seed|example|mock/.test(pathLower)) score += 10;
+
+  if (base === "package.json") score -= 20;
+  if (/config|eslint|postcss|tailwind|vite|next\.config|tsconfig|lock/.test(pathLower)) score -= 25;
+  if (/agents\.md|claude\.md|license|changelog/.test(base)) score -= 30;
+  if (pathLower.includes("/docs/")) score -= 8;
+
+  return score;
 }
 
 async function sortedEntries(directory: string): Promise<string[]> {

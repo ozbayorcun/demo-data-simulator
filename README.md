@@ -27,6 +27,7 @@ The CLI supports Codex, Claude Code, and a normalized command adapter.
 ```bash
 node dist/cli.js infer --agent codex --project . --accept-generated
 node dist/cli.js infer --agent claude --project . --accept-generated
+node dist/cli.js infer --agent codex --project . --profile fast --accept-generated
 ```
 
 Codex uses `codex exec` with a JSON Schema response contract. Claude Code uses print mode with `--output-format json` and `--json-schema`.
@@ -50,11 +51,12 @@ For custom agent CLIs, wire their non-interactive mode through `--agent-cmd` and
   dds doctor --agent auto
   dds init --project .
   dds infer --agent codex --project .
+  dds infer --agent codex --project . --profile fast
   dds infer --agent claude --project .
   dds infer --agent command --agent-cmd <bin> --agent-arg <arg> --project .
-dds validate --spec simulator.spec.json
-dds generate --spec simulator.spec.json --seed 42 --out demo-data
-dds explain --spec simulator.spec.json
+  dds validate --spec simulator.spec.json
+  dds generate --spec simulator.spec.json --seed 42 --out demo-data
+  dds explain --spec simulator.spec.json
 ```
 
 ## Safety Model
@@ -66,6 +68,13 @@ The CLI collects a bounded evidence bundle before invoking an agent:
 - applies simple secret redaction before building the prompt
 - writes `.demo-data-simulator/evidence-manifest.json`
 - treats repo contents as untrusted evidence, not instructions
+- ranks candidate files before spending the evidence budget, prioritizing source, schema, model, API, workflow, test, and fixture files over low-signal config/docs
+
+Evidence profiles:
+
+- `--profile fast`: smaller first-run bundle for larger repos
+- `--profile balanced`: default
+- `--profile wide`: larger bundle for deeper inference
 
 The agent is read-only from this tool's point of view. The generated spec is written to `.demo-data-simulator/simulator.spec.generated.json`; `simulator.spec.json` is user-owned.
 

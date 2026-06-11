@@ -8,6 +8,7 @@ import { initProject } from "./init.js";
 import { validateSpec } from "./spec.js";
 import { generateData } from "./generator.js";
 import { explainSpec } from "./explain.js";
+import { isEvidenceProfile } from "./evidence.js";
 import type { SimulatorSpec } from "./types.js";
 
 async function main(): Promise<void> {
@@ -34,6 +35,13 @@ async function main(): Promise<void> {
   }
 
   if (args.command === "infer") {
+    const evidenceProfile = getString(args.flags, "profile", "balanced") ?? "balanced";
+    if (!isEvidenceProfile(evidenceProfile)) {
+      console.error(`Invalid --profile "${evidenceProfile}". Expected fast, balanced, or wide.`);
+      process.exitCode = 1;
+      return;
+    }
+
     const envelope = await inferSpec({
       projectRoot: project,
       agent: (getString(args.flags, "agent", "auto") ?? "auto") as AgentName,
@@ -43,6 +51,7 @@ async function main(): Promise<void> {
       exclude: getStringArray(args.flags, "exclude"),
       maxFiles: getNumber(args.flags, "max-files"),
       maxBytes: getNumber(args.flags, "max-bytes"),
+      evidenceProfile,
       acceptGenerated: getBoolean(args.flags, "accept-generated"),
     });
     console.log(`${envelope.status}: ${envelope.brief ?? envelope.error ?? "Inference finished."}`);
@@ -101,6 +110,7 @@ Usage:
   dds doctor --agent auto
   dds init --project .
   dds infer --agent codex --project .
+  dds infer --agent codex --project . --profile fast
   dds infer --agent claude --project .
   dds infer --agent command --agent-cmd node --agent-arg examples/agents/field-service-agent.mjs --project .
   dds validate --spec simulator.spec.json

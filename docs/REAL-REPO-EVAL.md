@@ -29,7 +29,7 @@ Product fixes made from this run:
 
 Remaining product concern:
 
-- Real Codex inference can take 1-3 minutes on larger repos with the current evidence budget. A future `--profile fast` or smarter source-priority collector would improve first-run UX.
+- Real Codex inference can take 1-3 minutes on larger repos with the current evidence budget. This led to a source-priority collector and `--profile fast|balanced|wide`.
 
 ### Promptcade MVP
 
@@ -50,4 +50,4 @@ Product fixes made from this run:
 
 Remaining product concern:
 
-- The collector still needs source-priority ordering. Even after skipping obvious metadata directories, the order is simple lexical traversal rather than "domain-bearing files first."
+- Promptcade showed why source-priority ordering matters: agent skill/workflow files were safe to read, but not useful enough to spend early evidence budget on.

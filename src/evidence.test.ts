@@ -28,5 +28,26 @@ describe("collectEvidence", () => {
     expect(result.files.find((file) => file.path === "src/models.ts")?.content).not.toContain("secret-value");
     expect(result.manifest.totals.files).toBe(2);
   });
-});
 
+  it("prioritizes domain source over low-signal root docs when budget is tight", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "dds-evidence-priority-"));
+    await mkdir(path.join(root, "src"));
+    await writeFile(path.join(root, "AGENTS.md"), "Agent instructions", "utf8");
+    await writeFile(path.join(root, "README.md"), "Generic README", "utf8");
+    await writeFile(path.join(root, "src", "task-models.ts"), "export interface Task { id: string; status: string }", "utf8");
+
+    const result = await collectEvidence({ projectRoot: root, maxFiles: 1 });
+    expect(result.files.map((file) => file.path)).toEqual(["src/task-models.ts"]);
+  });
+
+  it("uses fast profile limits when raw limits are not provided", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "dds-evidence-fast-"));
+    await mkdir(path.join(root, "src"));
+    for (let index = 0; index < 50; index += 1) {
+      await writeFile(path.join(root, "src", `model-${index}.ts`), `export interface Entity${index} { id: string }`, "utf8");
+    }
+
+    const result = await collectEvidence({ projectRoot: root, profile: "fast" });
+    expect(result.files.length).toBeLessThanOrEqual(35);
+  });
+});
