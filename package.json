@@ -11,6 +11,10 @@
   "bugs": {
     "url": "https://github.com/ozbayorcun/demo-data-simulator/issues"
   },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "bin": {
     "demo-data-simulator": "./dist/cli.js",
     "dds": "./dist/cli.js"
