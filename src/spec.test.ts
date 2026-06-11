@@ -64,6 +64,10 @@ describe("normalizeSpec", () => {
             { name: "id", type: "string" },
             { name: "customerId", type: "foreign_key" },
             { name: "createdAt", type: "datetime" },
+            { name: "tags", type: "array_string" },
+            { name: "refs", type: "ref_array" },
+            { name: "reviewedAt", type: "timestamp_optional" },
+            { name: "title", type: "task_title" },
           ],
         },
         {
@@ -79,5 +83,9 @@ describe("normalizeSpec", () => {
     expect(normalized.entities[0].fields[0].type).toBe("id");
     expect(normalized.entities[0].fields[1].type).toBe("ref:Customer");
     expect(normalized.entities[0].fields[2].type).toBe("timestamp");
+    expect(normalized.entities[0].fields[3].type).toBe("string");
+    expect(normalized.entities[0].fields[4].type).toBe("string");
+    expect(normalized.entities[0].fields[5].type).toBe("timestamp");
+    expect(normalized.entities[0].fields[6].type).toBe("string");
   });
 });

@@ -1,4 +1,4 @@
-import type { EventSpec, SimulatorSpec } from "./types.js";
+import type { EventSpec, FieldType, SimulatorSpec } from "./types.js";
 
 export interface ValidationResult {
   ok: boolean;
@@ -8,44 +8,122 @@ export interface ValidationResult {
 
 export function normalizeSpec(spec: SimulatorSpec): SimulatorSpec {
   const relationships = spec.relationships ?? [];
+  const eventNames = new Set(spec.events.map((event) => event.name));
   return {
     ...spec,
-    entities: spec.entities.map((entity) => ({
-      ...entity,
-      fields: entity.fields.map((field) => {
-        const fieldType = String(field.type);
-        if (fieldType === "string" && field.name.toLowerCase() === "id") {
+    metrics: spec.metrics?.map((metric) => ({
+      ...metric,
+      dependsOn: metric.dependsOn?.filter((dependency) => eventNames.has(dependency)),
+    })),
+    entities: spec.entities.map((entity) => {
+      const hasExplicitId = entity.fields.some((field) => field.name.toLowerCase() === "id");
+      const primaryIdField = hasExplicitId
+        ? undefined
+        : entity.fields.find((field) => String(field.type) === "uuid" && /id$/i.test(field.name))?.name;
+      const fields = entity.fields.length > 0 && !hasExplicitId && !primaryIdField
+        ? [{ name: "id", type: "id" as const, required: true, description: "Synthetic simulator identifier." }, ...entity.fields]
+        : entity.fields;
+
+      return {
+        ...entity,
+        fields: fields.map((field) => {
+        const lowerFieldType = normalizedTypeName(field.type);
+        if ((lowerFieldType === "id" || lowerFieldType === "string" || lowerFieldType === "uuid") && (field.name.toLowerCase() === "id" || field.name === primaryIdField)) {
           return { ...field, type: "id" };
         }
-        if (fieldType === "datetime" || fieldType === "date") {
+        if (["string", "integer", "number", "boolean", "enum"].includes(lowerFieldType)) {
+          return { ...field, type: lowerFieldType as FieldType };
+        }
+        if (lowerFieldType === "timestamp" || lowerFieldType === "datetime" || lowerFieldType === "date") {
           return { ...field, type: "timestamp" };
         }
-        if (fieldType === "foreign_key" || fieldType === "reference" || fieldType === "ref") {
+        if (lowerFieldType === "array_foreign_key" || lowerFieldType === "array_reference") {
+          return { ...field, type: "string" };
+        }
+        if (lowerFieldType === "foreign_key" || lowerFieldType === "reference" || lowerFieldType === "ref") {
           const relationship = relationships.find(
             (candidate) => candidate.from === entity.name && candidate.field === field.name,
           );
           return { ...field, type: relationship ? `ref:${relationship.to}` : "string" };
         }
+        if (lowerFieldType === "uuid" && /id$/i.test(field.name)) {
+          const relationship = relationships.find(
+            (candidate) => candidate.from === entity.name && candidate.field === field.name,
+          );
+          return { ...field, type: relationship ? `ref:${relationship.to}` : "string" };
+        }
+        if (lowerFieldType.startsWith("array_") || lowerFieldType.startsWith("array<") || lowerFieldType.endsWith("_array")) {
+          return { ...field, type: "string" };
+        }
+        if (
+          lowerFieldType === "email" ||
+          lowerFieldType === "url" ||
+          lowerFieldType === "text" ||
+          lowerFieldType === "uuid" ||
+          lowerFieldType === "person_name" ||
+          lowerFieldType === "company_name" ||
+          lowerFieldType === "task_title" ||
+          lowerFieldType === "paragraph"
+        ) {
+          return { ...field, type: "string" };
+        }
         return field;
       }),
-    })),
+      };
+    }),
     events: spec.events.map((event) => ({
       ...event,
       fields: event.fields?.map((field) => {
-        const fieldType = String(field.type);
-        if (fieldType === "datetime" || fieldType === "date") {
+        const lowerFieldType = normalizedTypeName(field.type);
+        if (["string", "integer", "number", "boolean", "enum"].includes(lowerFieldType)) {
+          return { ...field, type: lowerFieldType as FieldType };
+        }
+        if (lowerFieldType === "timestamp" || lowerFieldType === "datetime" || lowerFieldType === "date") {
           return { ...field, type: "timestamp" };
         }
-        if (fieldType === "foreign_key" || fieldType === "reference" || fieldType === "ref") {
+        if (lowerFieldType === "array_foreign_key" || lowerFieldType === "array_reference") {
+          return { ...field, type: "string" };
+        }
+        if (lowerFieldType === "foreign_key" || lowerFieldType === "reference" || lowerFieldType === "ref") {
           const relationship = relationships.find(
             (candidate) => candidate.from === event.sourceEntity && candidate.field === field.name,
           );
           return { ...field, type: relationship ? `ref:${relationship.to}` : "string" };
         }
+        if (lowerFieldType === "uuid" && /id$/i.test(field.name)) {
+          const relationship = relationships.find(
+            (candidate) => candidate.from === event.sourceEntity && candidate.field === field.name,
+          );
+          return { ...field, type: relationship ? `ref:${relationship.to}` : "string" };
+        }
+        if (lowerFieldType.startsWith("array_") || lowerFieldType.startsWith("array<") || lowerFieldType.endsWith("_array")) {
+          return { ...field, type: "string" };
+        }
+        if (
+          lowerFieldType === "email" ||
+          lowerFieldType === "url" ||
+          lowerFieldType === "text" ||
+          lowerFieldType === "uuid" ||
+          lowerFieldType === "person_name" ||
+          lowerFieldType === "company_name" ||
+          lowerFieldType === "task_title" ||
+          lowerFieldType === "paragraph"
+        ) {
+          return { ...field, type: "string" };
+        }
         return field;
       }),
     })),
   };
+}
+
+function normalizedTypeName(value: unknown): string {
+  return String(value)
+    .toLowerCase()
+    .replace(/_optional$/, "")
+    .replace(/_nullable$/, "")
+    .replace(/ optional$/, "")
+    .replace(/ nullable$/, "");
 }
 
 export function validateSpec(value: unknown): ValidationResult {

@@ -40,8 +40,13 @@ const ALLOWED_EXTENSIONS = new Set([
 const SKIP_DIRECTORIES = new Set([
   ".git",
   ".demo-data-simulator",
+  ".bg-shell",
+  ".agent",
   ".next",
+  ".planning",
+  ".github",
   ".turbo",
+  ".tmp",
   ".cache",
   "coverage",
   "dist",
