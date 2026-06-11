@@ -2,7 +2,15 @@
 
 Agent-inferred demo data for business workflow apps.
 
-`demo-data-simulator` turns a repo into a versioned simulator spec, then generates deterministic CSV and JSONL demo data locally. The key split is simple: your agent infers the plan from bounded project evidence; this package validates the plan and generates repeatable data.
+`demo-data-simulator` lets Codex, Claude Code, or another local agent infer how your app works, then turns that inference into deterministic CSV and JSONL data.
+
+The split is deliberate:
+
+- the CLI collects bounded, redacted project evidence
+- your agent infers the entities, relationships, events, scenarios, and metrics
+- local deterministic code validates the spec and generates repeatable data
+
+Use it when you need believable demo, seed, fixture, or dashboard data for a workflow/SaaS app without hand-writing every table and event stream.
 
 ## Try It In 60 Seconds
 
@@ -20,19 +28,27 @@ Outputs:
 - `demo-data/metrics_daily.csv`
 - `demo-data/manifest.json`
 
-## Agent-Inferred Flow
+## Infer From A Repo
+
+Run the CLI inside a product repo and let your existing coding agent infer the simulator plan.
 
 The CLI supports Codex, Claude Code, and a normalized command adapter.
 
 ```bash
-node dist/cli.js infer --agent codex --project . --accept-generated
-node dist/cli.js infer --agent claude --project . --accept-generated
 node dist/cli.js infer --agent codex --project . --profile fast --accept-generated
+node dist/cli.js validate --spec simulator.spec.json
+node dist/cli.js generate --spec simulator.spec.json --seed 42 --out demo-data
 ```
 
 Codex uses `codex exec` with a JSON Schema response contract. Claude Code uses print mode with `--output-format json` and `--json-schema`.
 
-Any other local agent command can be used if it reads the prompt from stdin and prints the strict inference envelope as JSON.
+Claude Code and custom commands use the same inference contract:
+
+```bash
+node dist/cli.js infer --agent claude --project . --accept-generated
+```
+
+Any other local agent command can be used if it reads the prompt from stdin and prints the strict inference envelope as JSON:
 
 ```bash
 node dist/cli.js infer \
@@ -44,6 +60,53 @@ node dist/cli.js infer \
 ```
 
 For custom agent CLIs, wire their non-interactive mode through `--agent-cmd` and repeat `--agent-arg` for each argument.
+
+## What It Generates
+
+The generated output is intentionally boring and useful:
+
+- linked entity tables in `entities/*.csv`
+- event history in `events.jsonl`
+- daily metrics in `metrics_daily.csv`
+- a reproducibility manifest in `manifest.json`
+
+The generated rows are deterministic for the same spec and seed.
+
+## Why Not Faker?
+
+Faker makes fields. This makes workflow data.
+
+For example, faker can create a customer name. `demo-data-simulator` is meant to create customers, work orders, technicians, assignment events, completion events, exceptions, and metrics that agree with each other.
+
+That matters when you are building:
+
+- SaaS product demos
+- local seed data
+- analytics dashboards
+- AI-agent evaluation fixtures
+- sales or prototype environments
+
+## Why Not Just Prompt An Agent?
+
+Agents are good at inference. They are less reliable as the whole runtime.
+
+This package keeps the agent on the part it is good at: reading bounded evidence and drafting the simulator spec. The CLI handles the parts that should be boring and repeatable:
+
+- evidence collection and source prioritization
+- secret redaction
+- a strict JSON inference contract
+- spec validation
+- deterministic seeded generation
+- CSV/JSONL writers
+- CI-friendly commands
+
+That means the same inferred spec can be reviewed, committed, regenerated, and tested without asking an LLM to recreate rows every time.
+
+## CLI Core, Skill Layer
+
+This can pair well with agent skill packs. A skill can teach Codex or Claude when to call `dds`, how to review the generated spec, and how to improve it for a repo.
+
+The CLI remains the durable engine. It gives every agent the same evidence boundary, schema, validator, generator, and output format.
 
 ## Commands
 
@@ -84,6 +147,13 @@ MVP specs are JSON only and use `schemaVersion: "simulator.v1"`. A spec defines 
 
 See `examples/specs/field-service.simulator.spec.json`.
 
-## Why Not Faker?
+## When Not To Use It
 
-Faker makes fields. This makes coherent workflow data: entities link together, events happen over time, and metrics can be derived from the same generated activity.
+This is not the best tool for:
+
+- one-off random names or addresses
+- production anonymization
+- load testing with millions of rows
+- domains with no workflow, state changes, or relationships
+
+For those, a faker library, anonymization pipeline, or load-test generator is probably a better fit.

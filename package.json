@@ -1,7 +1,7 @@
 {
   "name": "demo-data-simulator",
   "version": "0.1.0",
-  "description": "Agent-inferred demo data for business workflow apps.",
+  "description": "Infer business workflow data models from a repo, then generate deterministic demo CSV/JSONL locally.",
   "type": "module",
   "bin": {
     "demo-data-simulator": "./dist/cli.js",
@@ -22,8 +22,13 @@
   "keywords": [
     "demo-data",
     "test-data",
+    "seed-data",
+    "synthetic-data",
     "agent",
+    "codex",
+    "claude",
     "simulation",
+    "workflow",
     "cli"
   ],
   "author": "",
