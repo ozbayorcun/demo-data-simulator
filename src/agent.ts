@@ -1,4 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -9,6 +10,29 @@ export type AgentName = "auto" | "codex" | "claude" | "command" | "none";
 
 export interface AgentDoctorResult {
   agent: AgentName;
+  ok: boolean;
+  detail: string;
+}
+
+interface AgentDoctorRunner {
+  env: NodeJS.ProcessEnv;
+  existsSync(path: string): boolean;
+  homedir(): string;
+  spawnSync(command: string, args: string[], options: { encoding: "utf8"; timeout?: number }): {
+    status: number | null;
+    stdout?: string;
+    stderr?: string;
+    error?: Error;
+  };
+}
+
+interface AuthProbeResult {
+  ok: boolean;
+  detail: string;
+  nextAction: string;
+}
+
+interface StructuredOutputProbeResult {
   ok: boolean;
   detail: string;
 }
@@ -30,19 +54,32 @@ export interface PresetAgentOptions {
 }
 
 export function doctorAgent(agent: AgentName): AgentDoctorResult {
+  return doctorAgentWithRunner(agent, defaultDoctorRunner);
+}
+
+export function doctorAgentWithRunner(agent: AgentName, runner: AgentDoctorRunner): AgentDoctorResult {
   if (agent === "none") {
     return { agent, ok: true, detail: "Agent disabled. Manual spec mode is available." };
   }
-  if (agent === "auto") {
-    const codex = findBinary("codex");
-    if (codex.ok) return { agent, ok: true, detail: `Detected codex: ${codex.detail}` };
-    const claude = findBinary("claude");
-    if (claude.ok) return { agent, ok: true, detail: `Detected claude: ${claude.detail}` };
-    return { agent, ok: false, detail: "No supported agent binary detected. Use --agent command or --agent none." };
+  if (agent === "command") {
+    return {
+      agent,
+      ok: true,
+      detail: "Adapter: command. Custom command adapter requires --agent-cmd and must write strict inference JSON to stdout.",
+    };
   }
-  if (agent === "codex") return findBinary("codex", agent);
-  if (agent === "claude") return findBinary("claude", agent);
-  return { agent, ok: true, detail: "Custom command adapter requires --agent-cmd." };
+  if (agent === "auto") {
+    const codex = inspectPresetAgent("codex", runner);
+    if (codex.ok) return { agent, ok: true, detail: `Auto selected codex. ${codex.detail}` };
+    const claude = inspectPresetAgent("claude", runner);
+    if (claude.ok) return { agent, ok: true, detail: `Auto selected claude. ${claude.detail}` };
+    return {
+      agent,
+      ok: false,
+      detail: `No supported agent adapter is ready. Codex: ${codex.detail} Claude: ${claude.detail} Next action: install and authenticate codex or claude, or use --agent command/--agent none.`,
+    };
+  }
+  return inspectPresetAgent(agent, runner);
 }
 
 export async function runCommandAgent(options: CommandAgentOptions): Promise<InferenceEnvelope> {
@@ -91,14 +128,123 @@ export function buildInferencePrompt(domainFiles: EvidenceFile[]): string {
   ].join("\n");
 }
 
-function findBinary(binary: string, agent: AgentName = "auto"): AgentDoctorResult {
-  const which = spawnSync("which", [binary], { encoding: "utf8" });
-  if (which.status !== 0) {
-    return { agent, ok: false, detail: `${binary} not found on PATH.` };
+const defaultDoctorRunner: AgentDoctorRunner = {
+  env: process.env,
+  existsSync,
+  homedir: os.homedir,
+  spawnSync: (command, args, options) => spawnSync(command, args, options),
+};
+
+function inspectPresetAgent(agent: Exclude<AgentName, "auto" | "command" | "none">, runner: AgentDoctorRunner): AgentDoctorResult {
+  const binary = findBinary(agent, runner);
+  if (!binary.ok) return binary;
+
+  const structuredOutput = probeStructuredOutput(agent, runner);
+  if (!structuredOutput.ok) {
+    return {
+      agent,
+      ok: false,
+      detail: `Adapter: ${agent}. Binary: ${binary.detail}. Structured JSON: ${structuredOutput.detail}. Next action: upgrade ${agent} or use --agent command with a JSON-producing wrapper.`,
+    };
   }
-  const version = spawnSync(binary, ["--version"], { encoding: "utf8" });
-  const detail = version.status === 0 ? version.stdout.trim() || which.stdout.trim() : which.stdout.trim();
-  return { agent, ok: true, detail };
+
+  const auth = probeLikelyAuth(agent, runner);
+  const detail = [
+    `Adapter: ${agent}`,
+    `Binary: ${binary.detail}`,
+    `Structured JSON: ${structuredOutput.detail}`,
+    `Auth: ${auth.detail}`,
+    `Next action: ${auth.ok ? `run dds infer --agent ${agent}` : auth.nextAction}`,
+  ].join(". ");
+
+  return { agent, ok: auth.ok, detail };
+}
+
+function findBinary(binary: Exclude<AgentName, "auto" | "command" | "none">, runner: AgentDoctorRunner): AgentDoctorResult {
+  const which = runner.spawnSync("which", [binary], { encoding: "utf8", timeout: 3_000 });
+  if (which.status !== 0) {
+    return { agent: binary, ok: false, detail: `${binary} not found on PATH.` };
+  }
+  const version = runner.spawnSync(binary, ["--version"], { encoding: "utf8", timeout: 3_000 });
+  const detail = version.status === 0 ? normalizeProbeOutput(version.stdout) || normalizeProbeOutput(which.stdout) : normalizeProbeOutput(which.stdout);
+  return { agent: binary, ok: true, detail };
+}
+
+function probeStructuredOutput(agent: Exclude<AgentName, "auto" | "command" | "none">, runner: AgentDoctorRunner): StructuredOutputProbeResult {
+  if (agent === "codex") {
+    const help = readFirstSuccessfulHelp("codex", [["exec", "--help"]], runner);
+    if (!help.ok) return help;
+    const hasSchema = help.output.includes("--output-schema");
+    const hasLastMessage = help.output.includes("--output-last-message");
+    if (hasSchema && hasLastMessage) return { ok: true, detail: "supported via codex exec --output-schema/--output-last-message" };
+    return { ok: false, detail: "codex exec help did not advertise --output-schema and --output-last-message" };
+  }
+
+  const help = readFirstSuccessfulHelp("claude", [["--help"], ["-p", "--help"]], runner);
+  if (!help.ok) return help;
+  const hasOutputFormat = help.output.includes("--output-format");
+  const hasJsonSchema = help.output.includes("--json-schema");
+  if (hasOutputFormat && hasJsonSchema) return { ok: true, detail: "supported via claude -p --output-format json --json-schema" };
+  return { ok: false, detail: "claude help did not advertise --output-format and --json-schema" };
+}
+
+function readFirstSuccessfulHelp(
+  command: string,
+  argSets: string[][],
+  runner: AgentDoctorRunner,
+): { ok: true; output: string } | { ok: false; detail: string } {
+  const failures: string[] = [];
+  for (const args of argSets) {
+    const result = runner.spawnSync(command, args, { encoding: "utf8", timeout: 3_000 });
+    const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+    if (result.status === 0 && output.trim().length > 0) return { ok: true, output };
+    failures.push(`${command} ${args.join(" ")}: ${normalizeProbeOutput(result.stderr) || result.error?.message || `exit ${result.status}`}`);
+  }
+  return { ok: false, detail: failures.join("; ") };
+}
+
+function probeLikelyAuth(agent: Exclude<AgentName, "auto" | "command" | "none">, runner: AgentDoctorRunner): AuthProbeResult {
+  if (agent === "codex") {
+    if (runner.env.OPENAI_API_KEY || runner.env.CODEX_API_KEY) {
+      return { ok: true, detail: "API key environment variable detected", nextAction: "run dds infer --agent codex" };
+    }
+    const codexHome = runner.env.CODEX_HOME;
+    const homes = [
+      ...(codexHome ? [codexHome] : []),
+      path.join(runner.homedir(), ".codex"),
+      path.join(runner.homedir(), ".config", "codex"),
+    ];
+    const authFiles = homes.flatMap((home) => [path.join(home, "auth.json"), path.join(home, "config.json"), path.join(home, "config.toml")]);
+    if (authFiles.some((file) => runner.existsSync(file))) {
+      return { ok: true, detail: "Codex auth/config file detected", nextAction: "run dds infer --agent codex" };
+    }
+    return {
+      ok: false,
+      detail: "not detected; infer is likely to fail before returning JSON",
+      nextAction: "run codex login or set OPENAI_API_KEY, then rerun dds doctor --agent codex",
+    };
+  }
+
+  if (runner.env.ANTHROPIC_API_KEY || runner.env.CLAUDE_API_KEY) {
+    return { ok: true, detail: "Claude API key environment variable detected", nextAction: "run dds infer --agent claude" };
+  }
+  const authFiles = [
+    path.join(runner.homedir(), ".claude.json"),
+    path.join(runner.homedir(), ".claude", ".credentials.json"),
+    path.join(runner.homedir(), ".config", "claude"),
+  ];
+  if (authFiles.some((file) => runner.existsSync(file))) {
+    return { ok: true, detail: "Claude auth/config file detected", nextAction: "run dds infer --agent claude" };
+  }
+  return {
+    ok: false,
+    detail: "not detected; infer is likely to fail before returning JSON",
+    nextAction: "run claude login or set ANTHROPIC_API_KEY, then rerun dds doctor --agent claude",
+  };
+}
+
+function normalizeProbeOutput(output: string | undefined): string {
+  return (output ?? "").trim().replace(/\s+/g, " ");
 }
 
 async function runCodexAgent(options: PresetAgentOptions): Promise<InferenceEnvelope> {
