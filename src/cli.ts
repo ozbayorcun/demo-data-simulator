@@ -100,6 +100,8 @@ function printHelp(): void {
 Usage:
   dds doctor --agent auto
   dds init --project .
+  dds infer --agent codex --project .
+  dds infer --agent claude --project .
   dds infer --agent command --agent-cmd node --agent-arg examples/agents/field-service-agent.mjs --project .
   dds validate --spec simulator.spec.json
   dds generate --spec simulator.spec.json --seed 42 --out demo-data
@@ -111,4 +113,3 @@ main().catch((error: unknown) => {
   console.error(error instanceof Error ? error.message : String(error));
   process.exitCode = 1;
 });
-

@@ -1,7 +1,7 @@
 import path from "node:path";
 import { existsSync } from "node:fs";
 import { copyFile } from "node:fs/promises";
-import { buildInferencePrompt, runCommandAgent } from "./agent.js";
+import { buildInferencePrompt, doctorAgent, runCommandAgent, runPresetAgent } from "./agent.js";
 import { collectEvidence } from "./evidence.js";
 import { writeJson, writeText } from "./fs-utils.js";
 import { validateSpec } from "./spec.js";
@@ -48,34 +48,12 @@ export async function inferSpec(options: InferOptions): Promise<InferenceEnvelop
     return envelope;
   }
 
-  if (options.agent !== "command") {
-    const envelope: InferenceEnvelope = {
-      schemaVersion: "inference.v1",
-      status: "needs_decision",
-      brief: `${options.agent} preset is planned, but MVP uses the normalized command adapter first.`,
-      questions: [
-        {
-          id: "agent_command",
-          question: "Rerun with --agent command --agent-cmd <binary> and repeat --agent-arg for arguments.",
-          default: "command",
-        },
-      ],
-    };
-    await writeDecisionFile(projectRoot, envelope);
-    return envelope;
-  }
-
-  if (!options.agentCmd) {
-    throw new Error("--agent-cmd is required when --agent command is used.");
-  }
-
   const prompt = buildInferencePrompt(evidence.files);
-  const envelope = await runCommandAgent({
-    command: options.agentCmd,
-    args: options.agentArgs ?? [],
-    cwd: projectRoot,
-    prompt,
-  });
+  const agent = resolveAgent(options.agent);
+  const envelope =
+    agent === "command"
+      ? await runCommandInference(options, projectRoot, prompt)
+      : await runPresetInference(agent, options, projectRoot, prompt);
 
   await writeJson(path.join(workspaceDir, "inference.json"), envelope);
 
@@ -107,6 +85,60 @@ export async function inferSpec(options: InferOptions): Promise<InferenceEnvelop
   return envelope;
 }
 
+function resolveAgent(agent: Exclude<AgentName, "none">): Exclude<AgentName, "auto" | "none"> {
+  if (agent !== "auto") return agent;
+  if (doctorAgent("codex").ok) return "codex";
+  if (doctorAgent("claude").ok) return "claude";
+  return "command";
+}
+
+async function runCommandInference(options: InferOptions, projectRoot: string, prompt: string): Promise<InferenceEnvelope> {
+  if (!options.agentCmd) {
+    return {
+      schemaVersion: "inference.v1",
+      status: "needs_decision",
+      brief: "No agent command was provided.",
+      questions: [
+        {
+          id: "agent_command",
+          question: "Rerun with --agent command --agent-cmd <binary> and repeat --agent-arg for arguments.",
+          default: "codex exec -",
+        },
+      ],
+    };
+  }
+
+  return runCommandAgent({
+    command: options.agentCmd,
+    args: options.agentArgs ?? [],
+    cwd: projectRoot,
+    prompt,
+  });
+}
+
+async function runPresetInference(
+  agent: Exclude<AgentName, "auto" | "command" | "none">,
+  options: InferOptions,
+  projectRoot: string,
+  prompt: string,
+): Promise<InferenceEnvelope> {
+  const doctor = doctorAgent(agent);
+  if (!doctor.ok) {
+    return {
+      schemaVersion: "inference.v1",
+      status: "error",
+      error: doctor.detail,
+    };
+  }
+
+  return runPresetAgent({
+    agent,
+    cwd: projectRoot,
+    prompt,
+    extraArgs: options.agentArgs,
+  });
+}
+
 async function writeDecisionFile(projectRoot: string, envelope: InferenceEnvelope): Promise<void> {
   await writeText(
     path.join(projectRoot, "NEEDS_DECISION.md"),
@@ -129,4 +161,3 @@ function renderAssumptions(envelope: InferenceEnvelope): string {
     "",
   ].join("\n");
 }
-

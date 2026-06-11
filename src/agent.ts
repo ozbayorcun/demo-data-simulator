@@ -1,4 +1,8 @@
 import { spawn, spawnSync } from "node:child_process";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { inferenceEnvelopeSchema } from "./schema.js";
 import type { EvidenceFile, InferenceEnvelope } from "./types.js";
 
 export type AgentName = "auto" | "codex" | "claude" | "command" | "none";
@@ -15,6 +19,14 @@ export interface CommandAgentOptions {
   cwd: string;
   timeoutMs?: number;
   prompt: string;
+}
+
+export interface PresetAgentOptions {
+  agent: Exclude<AgentName, "auto" | "command" | "none">;
+  cwd: string;
+  prompt: string;
+  timeoutMs?: number;
+  extraArgs?: string[];
 }
 
 export function doctorAgent(agent: AgentName): AgentDoctorResult {
@@ -54,6 +66,13 @@ export async function runCommandAgent(options: CommandAgentOptions): Promise<Inf
   }
 }
 
+export async function runPresetAgent(options: PresetAgentOptions): Promise<InferenceEnvelope> {
+  if (options.agent === "codex") {
+    return runCodexAgent(options);
+  }
+  return runClaudeAgent(options);
+}
+
 export function buildInferencePrompt(domainFiles: EvidenceFile[]): string {
   const evidence = domainFiles
     .map((file) => `--- ${file.path} (${file.reason}) ---\n${file.content}`)
@@ -80,6 +99,95 @@ function findBinary(binary: string, agent: AgentName = "auto"): AgentDoctorResul
   const version = spawnSync(binary, ["--version"], { encoding: "utf8" });
   const detail = version.status === 0 ? version.stdout.trim() || which.stdout.trim() : which.stdout.trim();
   return { agent, ok: true, detail };
+}
+
+async function runCodexAgent(options: PresetAgentOptions): Promise<InferenceEnvelope> {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "dds-codex-"));
+  const schemaPath = path.join(tempDir, "inference.schema.json");
+  const outputPath = path.join(tempDir, "last-message.json");
+  await writeFile(schemaPath, JSON.stringify(inferenceEnvelopeSchema), "utf8");
+
+  const result = await runProcess(
+    "codex",
+    [
+      "exec",
+      "--cd",
+      options.cwd,
+      "--skip-git-repo-check",
+      "--sandbox",
+      "read-only",
+      "--output-schema",
+      schemaPath,
+      "--output-last-message",
+      outputPath,
+      ...(options.extraArgs ?? []),
+      "-",
+    ],
+    options.prompt,
+    options.cwd,
+    options.timeoutMs ?? 180_000,
+  );
+
+  if (result.exitCode !== 0) {
+    return {
+      schemaVersion: "inference.v1",
+      status: "error",
+      error: `Codex exited with code ${result.exitCode}: ${result.stderr.trim() || result.stdout.trim()}`,
+    };
+  }
+
+  try {
+    const output = await readFile(outputPath, "utf8");
+    return parseInferenceEnvelope(output);
+  } catch {
+    return parseInferenceEnvelope(result.stdout);
+  }
+}
+
+async function runClaudeAgent(options: PresetAgentOptions): Promise<InferenceEnvelope> {
+  const result = await runProcess(
+    "claude",
+    [
+      "-p",
+      "--output-format",
+      "json",
+      "--json-schema",
+      JSON.stringify(inferenceEnvelopeSchema),
+      ...(options.extraArgs ?? []),
+    ],
+    options.prompt,
+    options.cwd,
+    options.timeoutMs ?? 180_000,
+  );
+
+  if (result.exitCode !== 0) {
+    return {
+      schemaVersion: "inference.v1",
+      status: "error",
+      error: `Claude exited with code ${result.exitCode}: ${result.stderr.trim() || result.stdout.trim()}`,
+    };
+  }
+
+  return parseInferenceEnvelope(result.stdout);
+}
+
+export function parseInferenceEnvelope(output: string): InferenceEnvelope {
+  const parsed = JSON.parse(output.trim()) as InferenceEnvelope | { structured_output?: InferenceEnvelope; result?: unknown };
+  if (isClaudeStructuredOutput(parsed)) {
+    return parsed.structured_output;
+  }
+  if (isClaudeResultJson(parsed)) {
+    return JSON.parse(parsed.result) as InferenceEnvelope;
+  }
+  return parsed as InferenceEnvelope;
+}
+
+function isClaudeStructuredOutput(value: unknown): value is { structured_output: InferenceEnvelope } {
+  return typeof value === "object" && value !== null && "structured_output" in value;
+}
+
+function isClaudeResultJson(value: unknown): value is { result: string } {
+  return typeof value === "object" && value !== null && typeof (value as { result?: unknown }).result === "string";
 }
 
 function runProcess(
@@ -113,4 +221,3 @@ function runProcess(
     child.stdin.end(stdin);
   });
 }
-

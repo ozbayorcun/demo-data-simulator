@@ -22,7 +22,16 @@ Outputs:
 
 ## Agent-Inferred Flow
 
-The MVP ships the normalized command adapter first. Any local agent command can be used if it reads the prompt from stdin and prints the strict inference envelope as JSON.
+The CLI supports Codex, Claude Code, and a normalized command adapter.
+
+```bash
+node dist/cli.js infer --agent codex --project . --accept-generated
+node dist/cli.js infer --agent claude --project . --accept-generated
+```
+
+Codex uses `codex exec` with a JSON Schema response contract. Claude Code uses print mode with `--output-format json` and `--json-schema`.
+
+Any other local agent command can be used if it reads the prompt from stdin and prints the strict inference envelope as JSON.
 
 ```bash
 node dist/cli.js infer \
@@ -33,14 +42,16 @@ node dist/cli.js infer \
   --accept-generated
 ```
 
-For real agent CLIs, wire their non-interactive mode through `--agent-cmd` and repeat `--agent-arg` for each argument. Built-in Codex and Claude presets are intentionally kept behind the shared adapter contract.
+For custom agent CLIs, wire their non-interactive mode through `--agent-cmd` and repeat `--agent-arg` for each argument.
 
 ## Commands
 
 ```bash
-dds doctor --agent auto
-dds init --project .
-dds infer --agent command --agent-cmd <bin> --agent-arg <arg> --project .
+  dds doctor --agent auto
+  dds init --project .
+  dds infer --agent codex --project .
+  dds infer --agent claude --project .
+  dds infer --agent command --agent-cmd <bin> --agent-arg <arg> --project .
 dds validate --spec simulator.spec.json
 dds generate --spec simulator.spec.json --seed 42 --out demo-data
 dds explain --spec simulator.spec.json
@@ -67,4 +78,3 @@ See `examples/specs/field-service.simulator.spec.json`.
 ## Why Not Faker?
 
 Faker makes fields. This makes coherent workflow data: entities link together, events happen over time, and metrics can be derived from the same generated activity.
-
