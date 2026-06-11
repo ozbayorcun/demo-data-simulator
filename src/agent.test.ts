@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildInferencePrompt, parseInferenceEnvelope } from "./agent.js";
+import { buildInferencePrompt, parseInferenceEnvelope, runCommandAgent } from "./agent.js";
 
 describe("buildInferencePrompt", () => {
   it("frames project files as untrusted evidence", () => {
@@ -30,5 +30,20 @@ describe("parseInferenceEnvelope", () => {
     );
     expect(envelope.status).toBe("ok");
     expect(envelope.brief).toBe("done");
+  });
+});
+
+describe("runCommandAgent", () => {
+  it("returns an inference error when the command is missing", async () => {
+    const envelope = await runCommandAgent({
+      command: "definitely-not-a-real-dds-agent",
+      args: [],
+      cwd: process.cwd(),
+      prompt: "{}",
+      timeoutMs: 1000,
+    });
+
+    expect(envelope.status).toBe("error");
+    expect(envelope.error).toContain("spawn definitely-not-a-real-dds-agent ENOENT");
   });
 });

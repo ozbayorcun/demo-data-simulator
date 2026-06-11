@@ -1,5 +1,7 @@
 # Real Repo Evaluation
 
+Maintainer note: these are local validation notes from private repos owned by the maintainer. They are included in the GitHub repo for product history, but they are not shipped in the npm package and are not intended as reproducible public examples.
+
 ## 2026-06-10
 
 ### TaskManager

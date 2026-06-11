@@ -1,4 +1,4 @@
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -50,5 +50,33 @@ describe("generateData", () => {
     expect(firstEvents).toEqual(secondEvents);
     expect(firstOrders).toEqual(secondOrders);
   });
-});
 
+  it("refuses to delete the current working directory", async () => {
+    await expect(generateData({ spec, seed: 42, outDir: process.cwd() })).rejects.toThrow(
+      /Refusing to generate into the current working directory/,
+    );
+  });
+
+  it("refuses to overwrite non-generated non-empty directories", async () => {
+    const outDir = await mkdtemp(path.join(os.tmpdir(), "dds-not-generated-"));
+    await writeFile(path.join(outDir, "keep.txt"), "important", "utf8");
+
+    await expect(generateData({ spec, seed: 42, outDir })).rejects.toThrow(
+      /Refusing to overwrite a non-empty directory/,
+    );
+    await expect(readFile(path.join(outDir, "keep.txt"), "utf8")).resolves.toBe("important");
+  });
+
+  it("honors selected output formats", async () => {
+    const outDir = await mkdtemp(path.join(os.tmpdir(), "dds-manifest-only-"));
+    await generateData({
+      spec: { ...spec, outputs: { formats: ["manifest"] } },
+      seed: 42,
+      outDir,
+    });
+
+    await expect(stat(path.join(outDir, "manifest.json"))).resolves.toBeTruthy();
+    await expect(stat(path.join(outDir, "events.jsonl"))).rejects.toThrow();
+    await expect(stat(path.join(outDir, "entities", "order.csv"))).rejects.toThrow();
+  });
+});

@@ -38,6 +38,16 @@ export function getNumber(flags: ParsedArgs["flags"], key: string, fallback?: nu
   return value === undefined ? fallback : Number(value);
 }
 
+export function getPositiveInteger(flags: ParsedArgs["flags"], key: string): number | undefined {
+  const value = getString(flags, key);
+  if (value === undefined) return undefined;
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < 1) {
+    throw new Error(`--${key} must be a positive integer.`);
+  }
+  return parsed;
+}
+
 export function getStringArray(flags: ParsedArgs["flags"], key: string): string[] {
   const value = flags[key];
   if (Array.isArray(value)) return value.map(String);
@@ -48,4 +58,3 @@ export function getStringArray(flags: ParsedArgs["flags"], key: string): string[
 export function getBoolean(flags: ParsedArgs["flags"], key: string): boolean {
   return flags[key] === true;
 }
-

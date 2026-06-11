@@ -12,13 +12,26 @@ The split is deliberate:
 
 Use it when you need believable demo, seed, fixture, or dashboard data for a workflow/SaaS app without hand-writing every table and event stream.
 
+Requires Node.js 20+.
+
 ## Try It In 60 Seconds
+
+From a repo checkout:
 
 ```bash
 npm install
 npm run build
 node dist/cli.js validate --spec examples/specs/field-service.simulator.spec.json
 node dist/cli.js generate --spec examples/specs/field-service.simulator.spec.json --seed 42 --out demo-data
+```
+
+After publishing, the same flow works through `npx`:
+
+```bash
+mkdir dds-demo && cd dds-demo
+npx demo-data-simulator init --project .
+npx demo-data-simulator validate --spec simulator.spec.json
+npx demo-data-simulator generate --spec simulator.spec.json --seed 42 --out demo-data
 ```
 
 Outputs:
@@ -32,7 +45,7 @@ Outputs:
 
 Run the CLI inside a product repo and let your existing coding agent infer the simulator plan.
 
-The CLI supports Codex, Claude Code, and a normalized command adapter.
+The CLI supports Codex, Claude Code, manual mode, and a normalized command adapter.
 
 ```bash
 node dist/cli.js infer --agent codex --project . --profile fast --accept-generated
@@ -40,15 +53,23 @@ node dist/cli.js validate --spec simulator.spec.json
 node dist/cli.js generate --spec simulator.spec.json --seed 42 --out demo-data
 ```
 
-Codex uses `codex exec` with a JSON Schema response contract. Claude Code uses print mode with `--output-format json` and `--json-schema`.
+Codex uses `codex exec` with a JSON Schema response contract.
 
-Claude Code and custom commands use the same inference contract:
+Claude Code uses print mode with `--output-format json` and `--json-schema`; `dds doctor --agent claude` currently verifies the binary is present, not that auth and structured-output mode are fully ready.
 
 ```bash
 node dist/cli.js infer --agent claude --project . --accept-generated
 ```
 
-Any other local agent command can be used if it reads the prompt from stdin and prints the strict inference envelope as JSON:
+Manual mode is available when you want to write or edit the spec yourself:
+
+```bash
+node dist/cli.js infer --agent none --project .
+```
+
+That writes `NEEDS_DECISION.md` with the next manual step.
+
+Any other local agent command can be used if it reads the prompt from stdin and prints the strict inference envelope as JSON. From this repo checkout:
 
 ```bash
 node dist/cli.js infer \
@@ -102,6 +123,14 @@ This package keeps the agent on the part it is good at: reading bounded evidence
 
 That means the same inferred spec can be reviewed, committed, regenerated, and tested without asking an LLM to recreate rows every time.
 
+Reproducibility check:
+
+```bash
+dds generate --spec simulator.spec.json --seed 42 --out demo-data-a
+dds generate --spec simulator.spec.json --seed 42 --out demo-data-b
+diff -ru demo-data-a demo-data-b
+```
+
 ## CLI Core, Skill Layer
 
 This can pair well with agent skill packs. A skill can teach Codex or Claude when to call `dds`, how to review the generated spec, and how to improve it for a repo.
@@ -139,7 +168,7 @@ Evidence profiles:
 - `--profile balanced`: default
 - `--profile wide`: larger bundle for deeper inference
 
-The agent is read-only from this tool's point of view. The generated spec is written to `.demo-data-simulator/simulator.spec.generated.json`; `simulator.spec.json` is user-owned.
+The built-in Codex preset is run with a read-only sandbox. Custom `--agent-cmd` commands are user-controlled, so review those commands the same way you would review any local script. The generated spec is written to `.demo-data-simulator/simulator.spec.generated.json`; `simulator.spec.json` is user-owned.
 
 ## Spec
 

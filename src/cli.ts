@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import path from "node:path";
 import { readJson } from "./fs-utils.js";
-import { parseArgs, getBoolean, getNumber, getString, getStringArray } from "./args.js";
+import { parseArgs, getBoolean, getPositiveInteger, getString, getStringArray } from "./args.js";
 import { doctorAgent, type AgentName } from "./agent.js";
 import { inferSpec } from "./infer.js";
 import { initProject } from "./init.js";
@@ -49,8 +49,8 @@ async function main(): Promise<void> {
       agentArgs: getStringArray(args.flags, "agent-arg"),
       include: getStringArray(args.flags, "include"),
       exclude: getStringArray(args.flags, "exclude"),
-      maxFiles: getNumber(args.flags, "max-files"),
-      maxBytes: getNumber(args.flags, "max-bytes"),
+      maxFiles: getPositiveInteger(args.flags, "max-files"),
+      maxBytes: getPositiveInteger(args.flags, "max-bytes"),
       evidenceProfile,
       acceptGenerated: getBoolean(args.flags, "accept-generated"),
     });

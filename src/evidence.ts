@@ -206,10 +206,26 @@ export function redactSecrets(input: string): { content: string; count: number }
     return `${key}=<REDACTED>`;
   };
 
-  let content = input.replace(
-    /\b(api[_-]?key|token|secret|password|authorization)\b\s*[:=]\s*["']?[^"'\s]+/gi,
+  let content = input.replace(/\bAuthorization\s*:\s*Bearer\s+[^\r\n]+/gi, () => {
+    count += 1;
+    return "Authorization: Bearer <REDACTED>";
+  });
+  content = content.replace(/\b(Basic|Bearer)\s+[A-Za-z0-9._~+/=-]{12,}/g, (match, scheme: string) => {
+    count += 1;
+    return `${scheme} <REDACTED>`;
+  });
+  content = content.replace(
+    /\b([A-Z0-9_]*(?:DATABASE_URL|DB_URL|REDIS_URL|MONGO(?:DB)?_URI|POSTGRES_URL)[A-Z0-9_]*)\s*[:=]\s*["']?[^"'\s]+/gi,
     replace,
   );
+  content = content.replace(
+    /\b([A-Z0-9_-]*(?:api[_-]?key|access[_-]?token|auth[_-]?token|refresh[_-]?token|token|secret|password|authorization)[A-Z0-9_-]*)\b\s*[:=]\s*(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\r\n#]+)/gi,
+    replace,
+  );
+  content = content.replace(/\/\/([^:\s/@]+):([^@\s/]+)@/g, () => {
+    count += 1;
+    return "//<REDACTED_CREDENTIALS>@";
+  });
   content = content.replace(/\bsk-[A-Za-z0-9_-]{10,}\b/g, () => {
     count += 1;
     return "<REDACTED_OPENAI_KEY>";

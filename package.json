@@ -10,12 +10,16 @@
   "files": [
     "dist",
     "README.md",
-    "docs",
+    "examples/agents",
+    "examples/field-service/README.md",
+    "examples/field-service/src",
+    "examples/field-service/test",
     "examples/specs"
   ],
   "scripts": {
     "build": "node scripts/clean-dist.mjs && tsc && node scripts/mark-cli-executable.mjs",
     "check": "npm run build && npm test",
+    "prepack": "npm run build",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

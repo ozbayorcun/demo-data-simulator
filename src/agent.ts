@@ -201,6 +201,7 @@ function runProcess(
     const child = spawn(command, args, { cwd, stdio: ["pipe", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
+    let settled = false;
     const timeout = setTimeout(() => {
       child.kill("SIGTERM");
       stderr += `\nTimed out after ${timeoutMs}ms.`;
@@ -214,7 +215,15 @@ function runProcess(
     child.stderr.on("data", (chunk) => {
       stderr += chunk;
     });
+    child.on("error", (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      resolve({ exitCode: 1, stdout, stderr: `${stderr}\n${error.message}` });
+    });
     child.on("close", (exitCode) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timeout);
       resolve({ exitCode, stdout, stderr });
     });

@@ -50,6 +50,53 @@ describe("validateSpec", () => {
     expect(result.ok).toBe(false);
     expect(result.errors.join("\n")).toContain("references missing entity customer");
   });
+
+  it("rejects invalid date defaults and numeric bounds", () => {
+    const result = validateSpec({
+      ...validSpec,
+      defaults: { days: 0, startDate: "not-a-date" },
+      entities: [
+        {
+          name: "ticket",
+          count: 3,
+          fields: [
+            { name: "id", type: "id" },
+            { name: "score", type: "integer", min: 10, max: 1 },
+          ],
+        },
+      ],
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.join("\n")).toContain("defaults.days");
+    expect(result.errors.join("\n")).toContain("defaults.startDate");
+    expect(result.errors.join("\n")).toContain("min must be <= max");
+  });
+
+  it("does not warn for valid forward references", () => {
+    const result = validateSpec({
+      ...validSpec,
+      entities: [
+        {
+          name: "ticket",
+          count: 3,
+          fields: [
+            { name: "id", type: "id" },
+            { name: "customer_id", type: "ref:customer" },
+          ],
+        },
+        {
+          name: "customer",
+          count: 2,
+          fields: [{ name: "id", type: "id" }],
+        },
+      ],
+      relationships: [{ from: "ticket", to: "customer", type: "many_to_one", field: "customer_id" }],
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.warnings).toEqual([]);
+  });
 });
 
 describe("normalizeSpec", () => {

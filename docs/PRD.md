@@ -5,6 +5,8 @@ Date: 2026-06-10
 Working package name: `demo-data-simulator`  
 Working CLI alias: `dds`
 
+Implementation note: this is a planning document, not the npm user guide. The current shipped behavior is documented in `README.md`; future-target requirements in this PRD should be treated as roadmap context unless the README and tests confirm them.
+
 ## 1. Product Concept
 
 `demo-data-simulator` is an agent-inferred demo data generator for business workflow apps.
@@ -108,7 +110,6 @@ The evidence manifest should record:
 - skipped files with reason
 - byte counts
 - redaction counts
-- inferred claims and their source evidence
 
 The prompt sent to the agent must include a defensive instruction:
 
@@ -171,7 +172,11 @@ npx demo-data-simulator doctor --agent auto
 Checks:
 
 - binary exists
-- version is supported
+- version is visible
+- manual mode availability
+
+Roadmap checks:
+
 - auth appears usable
 - non-interactive mode works
 - structured output mode is available or emulatable
@@ -297,7 +302,9 @@ Top-level shape:
   "events": [],
   "scenarios": [],
   "metrics": [],
-  "outputs": []
+  "outputs": {
+    "formats": ["csv", "jsonl", "manifest"]
+  }
 }
 ```
 

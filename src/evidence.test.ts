@@ -11,6 +11,21 @@ describe("redactSecrets", () => {
     expect(result.content).not.toContain("hunter2");
     expect(result.content).not.toContain("sk-testsecretvalue12345");
   });
+
+  it("redacts common authorization headers and database URLs", () => {
+    const result = redactSecrets(
+      [
+        "Authorization: Bearer secret-token-123456789",
+        "DATABASE_URL=postgres://user:pass@example.com/db",
+        'client_secret: "value with spaces"',
+      ].join("\n"),
+    );
+
+    expect(result.content).not.toContain("secret-token-123456789");
+    expect(result.content).not.toContain("postgres://user:pass@example.com/db");
+    expect(result.content).not.toContain("value with spaces");
+    expect(result.count).toBeGreaterThanOrEqual(3);
+  });
 });
 
 describe("collectEvidence", () => {

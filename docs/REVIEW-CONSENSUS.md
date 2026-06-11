@@ -50,6 +50,8 @@ The CLI should collect a safe evidence bundle from a project, pass that bounded 
 
 ## Open Questions
 
+Status note: these were review-time questions from the PRD stage. Current implementation answers some of them; see `README.md` and package tests for shipped behavior.
+
 - Which adapter ships first: Codex, Claude, or generic argv-array command?
 - Should the public package remain `demo-data-simulator`, or become a shorter brand like `simforge`?
 - Should `explain` ship in MVP or be deferred until the core trust path is complete?

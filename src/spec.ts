@@ -150,9 +150,11 @@ export function validateSpec(value: unknown): ValidationResult {
   if (!spec.outputs || !Array.isArray(spec.outputs.formats)) {
     errors.push("outputs.formats is required.");
   }
-
-  if (errors.length > 0) {
-    return { ok: false, errors, warnings };
+  if (spec.defaults?.days !== undefined && (!Number.isInteger(spec.defaults.days) || spec.defaults.days < 1)) {
+    errors.push("defaults.days must be an integer >= 1.");
+  }
+  if (spec.defaults?.startDate !== undefined && !isValidDateString(spec.defaults.startDate)) {
+    errors.push("defaults.startDate must be a parseable date string.");
   }
 
   const entityNames = new Set<string>();
@@ -190,11 +192,14 @@ export function validateSpec(value: unknown): ValidationResult {
       if (field.type === "enum" && (!Array.isArray(field.values) || field.values.length === 0)) {
         errors.push(`Entity ${entity.name}.${field.name} enum needs values.`);
       }
-      if (typeof field.type === "string" && field.type.startsWith("ref:")) {
-        const target = field.type.slice("ref:".length);
-        if (!entityNames.has(target)) {
-          warnings.push(`Entity ${entity.name}.${field.name} references ${target}; target is validated after all entities are read.`);
-        }
+      if (field.min !== undefined && typeof field.min !== "number") {
+        errors.push(`Entity ${entity.name}.${field.name} min must be a number.`);
+      }
+      if (field.max !== undefined && typeof field.max !== "number") {
+        errors.push(`Entity ${entity.name}.${field.name} max must be a number.`);
+      }
+      if (typeof field.min === "number" && typeof field.max === "number" && field.min > field.max) {
+        errors.push(`Entity ${entity.name}.${field.name} min must be <= max.`);
       }
     }
     if (!hasId) {
@@ -253,6 +258,11 @@ export function validateSpec(value: unknown): ValidationResult {
   }
 
   return { ok: errors.length === 0, errors, warnings };
+}
+
+function isValidDateString(value: string): boolean {
+  const candidate = value.includes("T") ? value : `${value}T00:00:00.000Z`;
+  return !Number.isNaN(new Date(candidate).getTime());
 }
 
 function validateEventDag(events: EventSpec[]): string[] {
