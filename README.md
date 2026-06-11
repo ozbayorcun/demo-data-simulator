@@ -20,22 +20,21 @@ Requires Node.js 20+.
 
 ## Try It In 60 Seconds
 
-From a repo checkout:
+No install needed:
 
 ```bash
-npm install
-npm run build
-node dist/cli.js validate --spec examples/specs/field-service.simulator.spec.json
-node dist/cli.js generate --spec examples/specs/field-service.simulator.spec.json --seed 42 --out demo-data
-```
-
-After npm publishing, the same flow works through `npx`:
-
-```bash
-mkdir dds-demo && cd dds-demo
 npx demo-data-simulator init --project .
 npx demo-data-simulator validate --spec simulator.spec.json
 npx demo-data-simulator generate --spec simulator.spec.json --seed 42 --out demo-data
+```
+
+Or install it globally:
+
+```bash
+npm install -g demo-data-simulator
+dds init --project .
+dds validate --spec simulator.spec.json
+dds generate --spec simulator.spec.json --seed 42 --out demo-data
 ```
 
 Outputs:
@@ -52,9 +51,9 @@ Run the CLI inside a product repo and let your existing coding agent infer the s
 The CLI supports Codex, Claude Code, manual mode, and a normalized command adapter.
 
 ```bash
-node dist/cli.js infer --agent codex --project . --profile fast --accept-generated
-node dist/cli.js validate --spec simulator.spec.json
-node dist/cli.js generate --spec simulator.spec.json --seed 42 --out demo-data
+npx demo-data-simulator infer --agent codex --project . --profile fast --accept-generated
+npx demo-data-simulator validate --spec simulator.spec.json
+npx demo-data-simulator generate --spec simulator.spec.json --seed 42 --out demo-data
 ```
 
 Codex uses `codex exec` with a JSON Schema response contract.
@@ -62,25 +61,25 @@ Codex uses `codex exec` with a JSON Schema response contract.
 Claude Code uses print mode with `--output-format json` and `--json-schema`; `dds doctor --agent claude` currently verifies the binary is present, not that auth and structured-output mode are fully ready.
 
 ```bash
-node dist/cli.js infer --agent claude --project . --accept-generated
+npx demo-data-simulator infer --agent claude --project . --accept-generated
 ```
 
 Manual mode is available when you want to write or edit the spec yourself:
 
 ```bash
-node dist/cli.js infer --agent none --project .
+npx demo-data-simulator infer --agent none --project .
 ```
 
 That writes `NEEDS_DECISION.md` with the next manual step.
 
-Any other local agent command can be used if it reads the prompt from stdin and prints the strict inference envelope as JSON. From this repo checkout:
+Any other local agent command can be used if it reads the prompt from stdin and prints the strict inference envelope as JSON:
 
 ```bash
-node dist/cli.js infer \
+npx demo-data-simulator infer \
   --agent command \
-  --project examples/field-service \
-  --agent-cmd node \
-  --agent-arg ../../examples/agents/field-service-agent.mjs \
+  --project . \
+  --agent-cmd your-agent \
+  --agent-arg --json \
   --accept-generated
 ```
 
@@ -179,12 +178,6 @@ The built-in Codex preset is run with a read-only sandbox. Custom `--agent-cmd` 
 MVP specs are JSON only and use `schemaVersion: "simulator.v1"`. A spec defines entities, fields, relationships, events, scenarios, metrics, and outputs.
 
 See `examples/specs/field-service.simulator.spec.json`.
-
-## Dogfood Notes
-
-The first real dogfood pass ran against a private mixed desktop/web task workflow app and generated linked identity, license, capture, candidate-task, stored-task, event, and metric data.
-
-See [Task Workflow Dogfood](https://github.com/ozbayorcun/demo-data-simulator/blob/main/docs/TASK-WORKFLOW-DOGFOOD.md).
 
 ## When Not To Use It
 
