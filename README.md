@@ -1,5 +1,9 @@
 # demo-data-simulator
 
+[![CI](https://github.com/ozbayorcun/demo-data-simulator/actions/workflows/ci.yml/badge.svg)](https://github.com/ozbayorcun/demo-data-simulator/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Node.js >=20](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](package.json)
+
 Agent-inferred demo data for business workflow apps.
 
 `demo-data-simulator` lets Codex, Claude Code, or another local agent infer how your app works, then turns that inference into deterministic CSV and JSONL data.
@@ -25,7 +29,7 @@ node dist/cli.js validate --spec examples/specs/field-service.simulator.spec.jso
 node dist/cli.js generate --spec examples/specs/field-service.simulator.spec.json --seed 42 --out demo-data
 ```
 
-After publishing, the same flow works through `npx`:
+After npm publishing, the same flow works through `npx`:
 
 ```bash
 mkdir dds-demo && cd dds-demo
