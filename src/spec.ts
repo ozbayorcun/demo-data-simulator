@@ -6,6 +6,48 @@ export interface ValidationResult {
   warnings: string[];
 }
 
+export function normalizeSpec(spec: SimulatorSpec): SimulatorSpec {
+  const relationships = spec.relationships ?? [];
+  return {
+    ...spec,
+    entities: spec.entities.map((entity) => ({
+      ...entity,
+      fields: entity.fields.map((field) => {
+        const fieldType = String(field.type);
+        if (fieldType === "string" && field.name.toLowerCase() === "id") {
+          return { ...field, type: "id" };
+        }
+        if (fieldType === "datetime" || fieldType === "date") {
+          return { ...field, type: "timestamp" };
+        }
+        if (fieldType === "foreign_key" || fieldType === "reference" || fieldType === "ref") {
+          const relationship = relationships.find(
+            (candidate) => candidate.from === entity.name && candidate.field === field.name,
+          );
+          return { ...field, type: relationship ? `ref:${relationship.to}` : "string" };
+        }
+        return field;
+      }),
+    })),
+    events: spec.events.map((event) => ({
+      ...event,
+      fields: event.fields?.map((field) => {
+        const fieldType = String(field.type);
+        if (fieldType === "datetime" || fieldType === "date") {
+          return { ...field, type: "timestamp" };
+        }
+        if (fieldType === "foreign_key" || fieldType === "reference" || fieldType === "ref") {
+          const relationship = relationships.find(
+            (candidate) => candidate.from === event.sourceEntity && candidate.field === field.name,
+          );
+          return { ...field, type: relationship ? `ref:${relationship.to}` : "string" };
+        }
+        return field;
+      }),
+    })),
+  };
+}
+
 export function validateSpec(value: unknown): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -184,4 +226,3 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
-

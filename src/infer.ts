@@ -4,7 +4,7 @@ import { copyFile } from "node:fs/promises";
 import { buildInferencePrompt, doctorAgent, runCommandAgent, runPresetAgent } from "./agent.js";
 import { collectEvidence } from "./evidence.js";
 import { writeJson, writeText } from "./fs-utils.js";
-import { validateSpec } from "./spec.js";
+import { normalizeSpec, validateSpec } from "./spec.js";
 import type { AgentName } from "./agent.js";
 import type { InferenceEnvelope } from "./types.js";
 
@@ -65,7 +65,8 @@ export async function inferSpec(options: InferOptions): Promise<InferenceEnvelop
     return envelope;
   }
 
-  const validation = validateSpec(envelope.spec);
+  const normalizedSpec = normalizeSpec(envelope.spec);
+  const validation = validateSpec(normalizedSpec);
   if (!validation.ok) {
     return {
       ...envelope,
@@ -75,7 +76,8 @@ export async function inferSpec(options: InferOptions): Promise<InferenceEnvelop
   }
 
   const generatedSpecPath = path.join(workspaceDir, "simulator.spec.generated.json");
-  await writeJson(generatedSpecPath, envelope.spec);
+  envelope.spec = normalizedSpec;
+  await writeJson(generatedSpecPath, normalizedSpec);
   await writeText(path.join(workspaceDir, "assumptions.md"), renderAssumptions(envelope));
 
   const userSpecPath = path.join(projectRoot, "simulator.spec.json");

@@ -39,6 +39,7 @@ const ALLOWED_EXTENSIONS = new Set([
 
 const SKIP_DIRECTORIES = new Set([
   ".git",
+  ".demo-data-simulator",
   ".next",
   ".turbo",
   ".cache",
@@ -227,4 +228,3 @@ function matchesAny(relativePath: string, patterns: string[]): boolean {
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
-

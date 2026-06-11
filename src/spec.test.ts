@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateSpec } from "./spec.js";
+import { normalizeSpec, validateSpec } from "./spec.js";
 import type { SimulatorSpec } from "./types.js";
 
 const validSpec: SimulatorSpec = {
@@ -52,3 +52,32 @@ describe("validateSpec", () => {
   });
 });
 
+describe("normalizeSpec", () => {
+  it("normalizes common agent field type names", () => {
+    const normalized = normalizeSpec({
+      ...validSpec,
+      entities: [
+        {
+          name: "WorkOrder",
+          count: 3,
+          fields: [
+            { name: "id", type: "string" },
+            { name: "customerId", type: "foreign_key" },
+            { name: "createdAt", type: "datetime" },
+          ],
+        },
+        {
+          name: "Customer",
+          count: 2,
+          fields: [{ name: "id", type: "string" }],
+        },
+      ],
+      relationships: [{ from: "WorkOrder", to: "Customer", type: "many_to_one", field: "customerId" }],
+      events: [{ name: "created", sourceEntity: "WorkOrder" }],
+    } as SimulatorSpec);
+
+    expect(normalized.entities[0].fields[0].type).toBe("id");
+    expect(normalized.entities[0].fields[1].type).toBe("ref:Customer");
+    expect(normalized.entities[0].fields[2].type).toBe("timestamp");
+  });
+});
