@@ -140,6 +140,8 @@ This can pair well with agent skill packs. A skill can teach Codex or Claude whe
 
 The CLI remains the durable engine. It gives every agent the same evidence boundary, schema, validator, generator, and output format.
 
+This package includes an agent skill at `skills/demo-data-simulator/SKILL.md`. Agent runtimes that support skill folders can copy or reference that directory so the agent knows when to use `dds`, how to review `simulator.spec.json`, and how to generate data safely.
+
 ## Commands
 
 ```bash

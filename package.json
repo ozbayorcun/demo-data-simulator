@@ -26,7 +26,8 @@
     "examples/field-service/README.md",
     "examples/field-service/src",
     "examples/field-service/test",
-    "examples/specs"
+    "examples/specs",
+    "skills"
   ],
   "scripts": {
     "build": "node scripts/clean-dist.mjs && tsc && node scripts/mark-cli-executable.mjs",

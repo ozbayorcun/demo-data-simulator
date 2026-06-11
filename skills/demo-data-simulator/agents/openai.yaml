@@ -1,0 +1,6 @@
+interface:
+  display_name: "Demo Data Simulator"
+  short_description: "Generate app-shaped demo data with dds"
+  default_prompt: "Use $demo-data-simulator to infer and generate deterministic demo data for this app."
+policy:
+  allow_implicit_invocation: true
