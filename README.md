@@ -142,6 +142,16 @@ The CLI remains the durable engine. It gives every agent the same evidence bound
 
 This package includes an agent skill at `skills/demo-data-simulator/SKILL.md`. Agent runtimes that support skill folders can copy or reference that directory so the agent knows when to use `dds`, how to review `simulator.spec.json`, and how to generate data safely.
 
+## Pre-Publish Local Pack Smoke Test
+
+Before any public npm release, verify the package from a local tarball:
+
+```bash
+npm run smoke:pack
+```
+
+The smoke test runs `npm pack`, installs the generated tarball into a clean temporary project, then verifies the packaged `dds` binary can print help, validate a sample spec, and generate sample CSV/JSONL/manifest output. It does not publish to npm, configure trusted publishing, or change account settings.
+
 ## Commands
 
 ```bash

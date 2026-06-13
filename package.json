@@ -33,6 +33,7 @@
     "build": "node scripts/clean-dist.mjs && tsc && node scripts/mark-cli-executable.mjs",
     "check": "npm run build && npm test",
     "prepack": "npm run build",
+    "smoke:pack": "node scripts/smoke-pack-install.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

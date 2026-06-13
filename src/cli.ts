@@ -16,7 +16,7 @@ async function main(): Promise<void> {
   const cwd = process.cwd();
   const project = path.resolve(getString(args.flags, "project", cwd) ?? cwd);
 
-  if (args.command === "help" || getBoolean(args.flags, "help")) {
+  if (args.command === "help" || args.command === "--help" || args.command === "-h" || getBoolean(args.flags, "help")) {
     printHelp();
     return;
   }
