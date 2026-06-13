@@ -1,0 +1,21 @@
+{
+  "generator": "demo-data-simulator",
+  "schemaVersion": "simulator.v1",
+  "seed": "42",
+  "domain": "field-service",
+  "generatedAt": "1970-01-01T00:00:00.000Z",
+  "files": [
+    "entities/customer.csv",
+    "entities/technician.csv",
+    "entities/work_order.csv",
+    "events.jsonl",
+    "metrics_daily.csv"
+  ],
+  "rows": {
+    "entities/customer.csv": 8,
+    "entities/technician.csv": 5,
+    "entities/work_order.csv": 30,
+    "events.jsonl": 90,
+    "metrics_daily.csv": 56
+  }
+}

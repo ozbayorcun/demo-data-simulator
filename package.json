@@ -23,6 +23,7 @@
     "dist",
     "README.md",
     "examples/agents",
+    "examples/field-service/dashboard",
     "examples/field-service/README.md",
     "examples/field-service/src",
     "examples/field-service/test",

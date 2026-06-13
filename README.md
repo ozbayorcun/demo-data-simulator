@@ -44,6 +44,10 @@ Outputs:
 - `demo-data/metrics_daily.csv`
 - `demo-data/manifest.json`
 
+For a quick visual proof, see the synthetic field-service dashboard example in
+`examples/field-service/dashboard/`. It reads generated `events.jsonl` and
+`metrics_daily.csv` files, and stays entirely local.
+
 ## Infer From A Repo
 
 Run the CLI inside a product repo and let your existing coding agent infer the simulator plan.
