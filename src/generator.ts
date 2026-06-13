@@ -113,18 +113,26 @@ function generateEvents(
   seed: string | number,
 ): Array<Record<string, unknown>> {
   const events: Array<Record<string, unknown>> = [];
+  const latestTimestampBySource = new Map<string, number>();
   for (const event of [...spec.events].sort((left, right) => (left.sequence ?? 0) - (right.sequence ?? 0) || left.name.localeCompare(right.name))) {
     const sourceRows = entityRows.get(event.sourceEntity) ?? [];
     const perEntity = event.countPerEntity ?? 1;
     sourceRows.forEach((sourceRow, sourceIndex) => {
       for (let eventIndex = 0; eventIndex < perEntity; eventIndex += 1) {
         const rng = new Rng(`${seed}:event:${event.name}:${sourceIndex}:${eventIndex}`);
+        const sourceId = sourceRow.id ?? sourceRow[`${event.sourceEntity}_id`] ?? `${event.sourceEntity}_${sourceIndex + 1}`;
         const row: Record<string, unknown> = {
           event_id: `${event.name}_${sourceIndex + 1}_${eventIndex + 1}`,
           event_name: event.name,
           source_entity: event.sourceEntity,
-          source_id: sourceRow.id ?? sourceRow[`${event.sourceEntity}_id`] ?? `${event.sourceEntity}_${sourceIndex + 1}`,
-          occurred_at: timestampFor(spec, sourceIndex + eventIndex, rng),
+          source_id: sourceId,
+          occurred_at: orderedTimestampFor(
+            spec,
+            sourceIndex + eventIndex,
+            rng,
+            latestTimestampBySource,
+            `${event.sourceEntity}:${sourceId}:${eventIndex}`,
+          ),
         };
         for (const field of event.fields ?? []) {
           row[field.name] = generateFieldValue(spec, field, rng, event.name, sourceIndex + eventIndex);
@@ -134,6 +142,20 @@ function generateEvents(
     });
   }
   return events.sort((left, right) => String(left.occurred_at).localeCompare(String(right.occurred_at)) || String(left.event_id).localeCompare(String(right.event_id)));
+}
+
+function orderedTimestampFor(
+  spec: SimulatorSpec,
+  index: number,
+  rng: Rng,
+  latestTimestampBySource: Map<string, number>,
+  sourceKey: string,
+): string {
+  const timestamp = new Date(timestampFor(spec, index, rng)).getTime();
+  const latestTimestamp = latestTimestampBySource.get(sourceKey);
+  const orderedTimestamp = latestTimestamp === undefined ? timestamp : Math.max(timestamp, latestTimestamp + 60_000);
+  latestTimestampBySource.set(sourceKey, orderedTimestamp);
+  return new Date(orderedTimestamp).toISOString();
 }
 
 function generateMetrics(spec: SimulatorSpec, events: Array<Record<string, unknown>>): Array<Record<string, unknown>> {
