@@ -79,4 +79,48 @@ describe("generateData", () => {
     await expect(stat(path.join(outDir, "events.jsonl"))).rejects.toThrow();
     await expect(stat(path.join(outDir, "entities", "order.csv"))).rejects.toThrow();
   });
+
+  it("preserves event sequence order for each source row", async () => {
+    const outDir = await mkdtemp(path.join(os.tmpdir(), "dds-sequence-"));
+    await generateData({
+      spec: {
+        ...spec,
+        events: [
+          { name: "order_created", sourceEntity: "order", sequence: 1 },
+          {
+            name: "order_scheduled",
+            sourceEntity: "order",
+            sequence: 2,
+            dependsOn: ["order_created"],
+          },
+          {
+            name: "order_completed",
+            sourceEntity: "order",
+            sequence: 3,
+            dependsOn: ["order_scheduled"],
+          },
+        ],
+      },
+      seed: 42,
+      outDir,
+    });
+
+    const events = (await readFile(path.join(outDir, "events.jsonl"), "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as { event_name: string; occurred_at: string; source_id: string });
+
+    const order = new Map([
+      ["order_created", 1],
+      ["order_scheduled", 2],
+      ["order_completed", 3],
+    ]);
+
+    for (const sourceId of new Set(events.map((event) => event.source_id))) {
+      const sourceEvents = events
+        .filter((event) => event.source_id === sourceId)
+        .sort((left, right) => left.occurred_at.localeCompare(right.occurred_at));
+      expect(sourceEvents.map((event) => order.get(event.event_name))).toEqual([1, 2, 3]);
+    }
+  });
 });
