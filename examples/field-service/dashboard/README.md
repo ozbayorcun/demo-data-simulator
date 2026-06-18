@@ -20,3 +20,5 @@ python3 -m http.server 4173
 Then open `http://127.0.0.1:4173/examples/field-service/dashboard/`.
 
 All data in this example is synthetic. It is not derived from private dogfood, customer, or production records.
+
+The committed fixture is covered by the test suite; `npm test` regenerates the field-service output with seed 42 and compares it against these dashboard files.

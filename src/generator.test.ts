@@ -5,6 +5,17 @@ import { describe, expect, it } from "vitest";
 import { generateData } from "./generator.js";
 import type { SimulatorSpec } from "./types.js";
 
+const fieldServiceSpecPath = path.resolve("examples/specs/field-service.simulator.spec.json");
+const fieldServiceFixtureDir = path.resolve("examples/field-service/dashboard/data");
+const fieldServiceFixtureFiles = [
+  "entities/customer.csv",
+  "entities/technician.csv",
+  "entities/work_order.csv",
+  "events.jsonl",
+  "manifest.json",
+  "metrics_daily.csv",
+];
+
 const spec: SimulatorSpec = {
   schemaVersion: "simulator.v1",
   domain: "marketplace",
@@ -121,6 +132,21 @@ describe("generateData", () => {
         .filter((event) => event.source_id === sourceId)
         .sort((left, right) => left.occurred_at.localeCompare(right.occurred_at));
       expect(sourceEvents.map((event) => order.get(event.event_name))).toEqual([1, 2, 3]);
+    }
+  });
+
+  it("keeps the field-service dashboard golden outputs reproducible", async () => {
+    const outDir = await mkdtemp(path.join(os.tmpdir(), "dds-field-service-golden-"));
+    const fieldServiceSpec = JSON.parse(await readFile(fieldServiceSpecPath, "utf8")) as SimulatorSpec;
+
+    const result = await generateData({ spec: fieldServiceSpec, seed: 42, outDir });
+
+    expect(result.files).toEqual(fieldServiceFixtureFiles);
+
+    for (const fixtureFile of fieldServiceFixtureFiles) {
+      const expected = await readFile(path.join(fieldServiceFixtureDir, fixtureFile), "utf8");
+      const actual = await readFile(path.join(outDir, fixtureFile), "utf8");
+      expect(actual, fixtureFile).toEqual(expected);
     }
   });
 });
