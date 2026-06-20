@@ -78,6 +78,38 @@ describe("generateData", () => {
     await expect(readFile(path.join(outDir, "keep.txt"), "utf8")).resolves.toBe("important");
   });
 
+  it("generates richer deterministic values for common workflow fields", async () => {
+    const outDir = await mkdtemp(path.join(os.tmpdir(), "dds-richer-fields-"));
+    await generateData({
+      spec: {
+        ...spec,
+        entities: [
+          {
+            name: "customer",
+            count: 3,
+            fields: [
+              { name: "id", type: "id" },
+              { name: "name", type: "string" },
+              { name: "email", type: "string" },
+              { name: "status", type: "enum", values: ["new", "active", "retained"] },
+            ],
+          },
+        ],
+        relationships: [],
+        events: [{ name: "customer_created", sourceEntity: "customer" }],
+      },
+      seed: 42,
+      outDir,
+    });
+
+    const customers = await readFile(path.join(outDir, "entities", "customer.csv"), "utf8");
+    expect(customers).toContain("Pioneer Works");
+    expect(customers).toContain("@example.test");
+    expect(customers).toContain("new");
+    expect(customers).toContain("active");
+    expect(customers).not.toContain("name_1");
+  });
+
   it("honors selected output formats", async () => {
     const outDir = await mkdtemp(path.join(os.tmpdir(), "dds-manifest-only-"));
     await generateData({

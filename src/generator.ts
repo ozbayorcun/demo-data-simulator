@@ -85,6 +85,36 @@ function generateEntityRows(spec: SimulatorSpec, entity: EntitySpec, seed: strin
   return rows;
 }
 
+function normalizedName(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function titleize(value: string): string {
+  return value
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
+    .join(" ");
+}
+
+function slug(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+const FIRST_NAMES = ["Avery", "Jordan", "Morgan", "Riley", "Taylor", "Casey", "Quinn", "Maya"];
+const LAST_NAMES = ["Patel", "Rivera", "Chen", "Morgan", "Brooks", "Singh", "Carter", "Nguyen"];
+const BUSINESS_PREFIXES = ["Northstar", "Brightline", "Summit", "Harbor", "Pioneer", "Evergreen", "Metro", "Bluebird"];
+const BUSINESS_NOUNS = ["Services", "Logistics", "Homes", "Partners", "Facilities", "Systems", "Works", "Group"];
+const WORK_VERBS = ["Inspect", "Schedule", "Repair", "Review", "Install", "Dispatch", "Approve", "Replace"];
+const DOMAIN_OBJECTS = ["request", "asset", "site", "handoff", "route", "ticket", "order", "visit"];
+const DESCRIPTION_OPENERS = ["Follow up on", "Coordinate", "Validate", "Prepare", "Resolve", "Document"];
+const CITIES = ["Austin", "Boston", "Chicago", "Denver", "Phoenix", "Portland", "Raleigh", "Seattle"];
+const REGIONS = ["Northeast", "Southeast", "Midwest", "Southwest", "West", "Central"];
+const STREET_NAMES = ["Market", "Cedar", "Lake", "Maple", "Oak", "Pine", "River", "Summit"];
+const STREET_TYPES = ["St", "Ave", "Blvd", "Rd", "Ln"];
+const SEGMENTS = ["standard", "growth", "enterprise", "strategic", "managed"];
+const ROLES = ["coordinator", "operator", "manager", "specialist", "analyst"];
+
 function generateFieldValue(
   spec: SimulatorSpec,
   field: FieldSpec,
@@ -93,11 +123,11 @@ function generateFieldValue(
   index: number,
 ): unknown {
   if (field.type === "id") return `${entityName}_${index + 1}`;
-  if (field.type === "string") return `${field.name}_${index + 1}`;
+  if (field.type === "string") return generateStringValue(spec, field, entityName, index);
   if (field.type === "integer") return rng.integer(field.min ?? 1, field.max ?? 100);
   if (field.type === "number") return Number((rng.integer(field.min ?? 1, field.max ?? 1000) / 10).toFixed(1));
   if (field.type === "boolean") return rng.next() >= 0.5;
-  if (field.type === "enum") return rng.pick(field.values ?? ["unknown"]);
+  if (field.type === "enum") return generateEnumValue(field, rng, index);
   if (field.type === "timestamp") return timestampFor(spec, index, rng);
   if (field.type.startsWith("ref:")) {
     const target = field.type.slice("ref:".length);
@@ -105,6 +135,71 @@ function generateFieldValue(
     return `${target}_${rng.integer(1, targetEntity?.count ?? 1)}`;
   }
   return "";
+}
+
+function generateStringValue(
+  spec: SimulatorSpec,
+  field: FieldSpec,
+  entityName: string,
+  index: number,
+): string {
+  const fieldName = normalizedName(field.name);
+  const entity = normalizedName(entityName);
+  const domain = normalizedName(spec.domain);
+  const localRng = new Rng(`${spec.domain}:${entityName}:${field.name}:${index}`);
+
+  if (fieldName === "name" || fieldName.endsWith("name")) {
+    if (/(company|customer|account|vendor|supplier|merchant|brand|client)/.test(entity)) {
+      return `${localRng.pick(BUSINESS_PREFIXES)} ${localRng.pick(BUSINESS_NOUNS)}`;
+    }
+    if (/(technician|agent|user|person|employee|owner|driver|rep|manager)/.test(entity)) {
+      return `${localRng.pick(FIRST_NAMES)} ${localRng.pick(LAST_NAMES)}`;
+    }
+    return `${titleize(entityName)} ${index + 1}`;
+  }
+  if (/(title|subject|headline|task|issue|ticket|workorder|work_order)/.test(fieldName)) {
+    return `${localRng.pick(WORK_VERBS)} ${localRng.pick(DOMAIN_OBJECTS)} ${index + 1}`;
+  }
+  if (/(description|summary|notes?|details?|comment)/.test(fieldName)) {
+    return `${localRng.pick(DESCRIPTION_OPENERS)} ${domain || entity} workflow item ${index + 1}.`;
+  }
+  if (fieldName.includes("email")) {
+    return `${slug(localRng.pick(FIRST_NAMES))}.${slug(localRng.pick(LAST_NAMES))}${index + 1}@example.test`;
+  }
+  if (/(phone|mobile|tel)/.test(fieldName)) {
+    return `+1-555-01${String(index % 100).padStart(2, "0")}`;
+  }
+  if (/(url|website|link)/.test(fieldName)) {
+    return `https://example.test/${slug(entityName)}/${index + 1}`;
+  }
+  if (fieldName.includes("city")) {
+    return localRng.pick(CITIES);
+  }
+  if (/(state|region|territory|zone)/.test(fieldName)) {
+    return localRng.pick(REGIONS);
+  }
+  if (/(address|street)/.test(fieldName)) {
+    return `${100 + index} ${localRng.pick(STREET_NAMES)} ${localRng.pick(STREET_TYPES)}`;
+  }
+  if (/(category|type|segment)/.test(fieldName)) {
+    return localRng.pick(SEGMENTS);
+  }
+  if (/(role|position)/.test(fieldName)) {
+    return localRng.pick(ROLES);
+  }
+  if (fieldName.includes("code")) {
+    return `${entityName.slice(0, 3).toUpperCase()}-${String(index + 1).padStart(4, "0")}`;
+  }
+  return `${field.name}_${index + 1}`;
+}
+
+function generateEnumValue(field: FieldSpec, rng: Rng, index: number): string {
+  const values = field.values ?? ["unknown"];
+  if (values.length === 0) return "unknown";
+  if (/(status|state|stage|phase)/.test(normalizedName(field.name))) {
+    return values[Math.min(index, values.length - 1)];
+  }
+  return rng.pick(values);
 }
 
 function generateEvents(
