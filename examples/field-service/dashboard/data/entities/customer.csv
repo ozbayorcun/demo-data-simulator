@@ -1,9 +1,9 @@
 id,name,segment
-customer_1,name_1,residential
-customer_2,name_2,commercial
-customer_3,name_3,residential
-customer_4,name_4,commercial
-customer_5,name_5,commercial
-customer_6,name_6,residential
-customer_7,name_7,commercial
-customer_8,name_8,residential
+customer_1,Summit Works,residential
+customer_2,Evergreen Facilities,commercial
+customer_3,Summit Partners,residential
+customer_4,Northstar Partners,commercial
+customer_5,Harbor Group,commercial
+customer_6,Northstar Works,residential
+customer_7,Brightline Homes,commercial
+customer_8,Northstar Logistics,residential

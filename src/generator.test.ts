@@ -78,6 +78,99 @@ describe("generateData", () => {
     await expect(readFile(path.join(outDir, "keep.txt"), "utf8")).resolves.toBe("important");
   });
 
+  it("generates richer deterministic values for common workflow fields", async () => {
+    const outDir = await mkdtemp(path.join(os.tmpdir(), "dds-richer-fields-"));
+    await generateData({
+      spec: {
+        ...spec,
+        entities: [
+          {
+            name: "customer",
+            count: 3,
+            fields: [
+              { name: "id", type: "id" },
+              { name: "name", type: "string" },
+              { name: "email", type: "string" },
+              { name: "status", type: "enum", values: ["new", "active", "retained"] },
+            ],
+          },
+        ],
+        relationships: [],
+        events: [{ name: "customer_created", sourceEntity: "customer" }],
+      },
+      seed: 42,
+      outDir,
+    });
+
+    const customers = await readFile(path.join(outDir, "entities", "customer.csv"), "utf8");
+    expect(customers).toContain("@example.test");
+    expect(customers).toContain("new");
+    expect(customers).toContain("active");
+    expect(customers).not.toContain("name_1");
+  });
+
+  it("uses the seed when generating semantic string values", async () => {
+    const first = await mkdtemp(path.join(os.tmpdir(), "dds-semantic-seed-first-"));
+    const second = await mkdtemp(path.join(os.tmpdir(), "dds-semantic-seed-second-"));
+    const semanticSpec: SimulatorSpec = {
+      ...spec,
+      entities: [
+        {
+          name: "customer",
+          count: 3,
+          fields: [
+            { name: "id", type: "id" },
+            { name: "name", type: "string" },
+            { name: "email", type: "string" },
+            { name: "region", type: "string" },
+          ],
+        },
+      ],
+      relationships: [],
+      events: [],
+    };
+
+    await generateData({ spec: semanticSpec, seed: 42, outDir: first });
+    await generateData({ spec: semanticSpec, seed: 43, outDir: second });
+
+    const firstCustomers = await readFile(path.join(first, "entities", "customer.csv"), "utf8");
+    const secondCustomers = await readFile(path.join(second, "entities", "customer.csv"), "utf8");
+    expect(firstCustomers).not.toEqual(secondCustomers);
+  });
+
+  it("uses seeded selection after covering status enum values", async () => {
+    const outDir = await mkdtemp(path.join(os.tmpdir(), "dds-status-seed-"));
+    await generateData({
+      spec: {
+        ...spec,
+        entities: [
+          {
+            name: "ticket",
+            count: 12,
+            fields: [
+              { name: "id", type: "id" },
+              { name: "status", type: "enum", values: ["open", "in_progress", "closed"] },
+            ],
+          },
+        ],
+        relationships: [],
+        events: [],
+      },
+      seed: 42,
+      outDir,
+    });
+
+    const tickets = await readFile(path.join(outDir, "entities", "ticket.csv"), "utf8");
+    const statuses = tickets
+      .trim()
+      .split("\n")
+      .slice(1)
+      .map((line) => line.split(",")[1]);
+
+    expect(statuses.slice(0, 3)).toEqual(["open", "in_progress", "closed"]);
+    expect(statuses.slice(3).some((status) => status !== "closed")).toBe(true);
+  });
+
   it("honors selected output formats", async () => {
     const outDir = await mkdtemp(path.join(os.tmpdir(), "dds-manifest-only-"));
     await generateData({
