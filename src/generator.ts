@@ -3,7 +3,7 @@ import { readdir, readFile, rm } from "node:fs/promises";
 import type { EntitySpec, FieldSpec, SimulatorSpec } from "./types.js";
 import { Rng } from "./rng.js";
 import { writeJson } from "./fs-utils.js";
-import { writeCsv, writeJsonl } from "./writers.js";
+import { writeCsv, writeJsonl, writeSqlInserts, type SqlInsertSection } from "./writers.js";
 
 export interface GenerateOptions {
   spec: SimulatorSpec;
@@ -26,8 +26,9 @@ export async function generateData(options: GenerateOptions): Promise<GenerateRe
   const writtenFiles: string[] = [];
   const rowCounts: Record<string, number> = {};
   const formats = new Set(spec.outputs.formats);
+  const entitiesForOutput = orderedEntitiesForOutput(spec);
 
-  for (const entity of [...spec.entities].sort(byName)) {
+  for (const entity of entitiesForOutput) {
     const rows = generateEntityRows(spec, entity, options.seed);
     entityRows.set(entity.name, rows);
     if (formats.has("csv")) {
@@ -39,6 +40,7 @@ export async function generateData(options: GenerateOptions): Promise<GenerateRe
   }
 
   const events = generateEvents(spec, entityRows, options.seed);
+  const metrics = formats.has("csv") || formats.has("sql") ? generateMetrics(spec, events) : [];
   if (formats.has("jsonl")) {
     const eventsFile = path.join(outDir, "events.jsonl");
     await writeJsonl(eventsFile, events);
@@ -47,11 +49,25 @@ export async function generateData(options: GenerateOptions): Promise<GenerateRe
   }
 
   if (formats.has("csv")) {
-    const metrics = generateMetrics(spec, events);
     const metricsFile = path.join(outDir, "metrics_daily.csv");
     await writeCsv(metricsFile, metrics);
     writtenFiles.push(path.relative(outDir, metricsFile));
     rowCounts["metrics_daily.csv"] = metrics.length;
+  }
+
+  if (formats.has("sql")) {
+    const sqlSections: SqlInsertSection[] = [
+      ...entitiesForOutput.map((entity) => ({
+        tableName: entity.name,
+        rows: entityRows.get(entity.name) ?? [],
+      })),
+      { tableName: "events", rows: events },
+      { tableName: "metrics_daily", rows: metrics },
+    ];
+    const sqlFile = path.join(outDir, "seed.sql");
+    await writeSqlInserts(sqlFile, sqlSections);
+    writtenFiles.push(path.relative(outDir, sqlFile));
+    rowCounts["seed.sql"] = sqlSections.reduce((total, section) => total + section.rows.length, 0);
   }
 
   if (formats.has("manifest")) {
@@ -193,6 +209,42 @@ function timestampFor(spec: SimulatorSpec, index: number, rng: Rng): string {
 
 function byName(left: { name: string }, right: { name: string }): number {
   return left.name.localeCompare(right.name);
+}
+
+function orderedEntitiesForOutput(spec: SimulatorSpec): EntitySpec[] {
+  const entitiesByName = new Map(spec.entities.map((entity) => [entity.name, entity]));
+  const dependencies = new Map<string, Set<string>>();
+  for (const entity of spec.entities) dependencies.set(entity.name, new Set());
+  for (const relationship of spec.relationships ?? []) {
+    if (entitiesByName.has(relationship.from) && entitiesByName.has(relationship.to)) {
+      dependencies.get(relationship.from)?.add(relationship.to);
+    }
+  }
+  for (const entity of spec.entities) {
+    for (const field of entity.fields) {
+      if (!field.type.startsWith("ref:")) continue;
+      const target = field.type.slice("ref:".length);
+      if (entitiesByName.has(target)) dependencies.get(entity.name)?.add(target);
+    }
+  }
+
+  const output: EntitySpec[] = [];
+  const temporary = new Set<string>();
+  const permanent = new Set<string>();
+
+  const visit = (entityName: string): void => {
+    if (permanent.has(entityName)) return;
+    if (temporary.has(entityName)) return;
+    temporary.add(entityName);
+    for (const dependency of [...(dependencies.get(entityName) ?? [])].sort()) visit(dependency);
+    temporary.delete(entityName);
+    permanent.add(entityName);
+    const entity = entitiesByName.get(entityName);
+    if (entity) output.push(entity);
+  };
+
+  for (const entity of [...spec.entities].sort(byName)) visit(entity.name);
+  return output;
 }
 
 async function assertSafeOutputDirectory(outDir: string): Promise<void> {

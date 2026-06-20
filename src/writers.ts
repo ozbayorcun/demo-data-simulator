@@ -1,6 +1,11 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+export interface SqlInsertSection {
+  tableName: string;
+  rows: Array<Record<string, unknown>>;
+}
+
 export async function writeCsv(filePath: string, rows: Array<Record<string, unknown>>): Promise<void> {
   await mkdir(path.dirname(filePath), { recursive: true });
   const headers = stableHeaders(rows);
@@ -11,6 +16,15 @@ export async function writeCsv(filePath: string, rows: Array<Record<string, unkn
 export async function writeJsonl(filePath: string, rows: Array<Record<string, unknown>>): Promise<void> {
   await mkdir(path.dirname(filePath), { recursive: true });
   await writeFile(filePath, `${rows.map((row) => JSON.stringify(sortObject(row))).join("\n")}\n`, "utf8");
+}
+
+export async function writeSqlInserts(filePath: string, sections: SqlInsertSection[]): Promise<void> {
+  await mkdir(path.dirname(filePath), { recursive: true });
+  const body = sections
+    .map((section) => sqlSection(section))
+    .filter((section) => section.length > 0)
+    .join("\n\n");
+  await writeFile(filePath, `${body}${body.length ? "\n" : ""}`, "utf8");
 }
 
 export function sortObject(value: Record<string, unknown>): Record<string, unknown> {
@@ -34,3 +48,25 @@ function csvCell(value: unknown): string {
   return stringValue;
 }
 
+function sqlSection(section: SqlInsertSection): string {
+  if (section.rows.length === 0) return `-- No rows for ${sqlIdentifier(section.tableName)}.`;
+  const headers = stableHeaders(section.rows);
+  const columns = headers.map(sqlIdentifier).join(", ");
+  return section.rows
+    .map((row) => {
+      const values = headers.map((header) => sqlValue(row[header])).join(", ");
+      return `INSERT INTO ${sqlIdentifier(section.tableName)} (${columns}) VALUES (${values});`;
+    })
+    .join("\n");
+}
+
+function sqlIdentifier(value: string): string {
+  return `"${value.replace(/"/g, '""')}"`;
+}
+
+function sqlValue(value: unknown): string {
+  if (value === undefined || value === null) return "NULL";
+  if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return `'${String(value).replace(/'/g, "''")}'`;
+}

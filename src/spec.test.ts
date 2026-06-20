@@ -24,6 +24,10 @@ describe("validateSpec", () => {
     expect(validateSpec(validSpec).ok).toBe(true);
   });
 
+  it("accepts sql as an output format", () => {
+    expect(validateSpec({ ...validSpec, outputs: { formats: ["sql", "manifest"] } }).ok).toBe(true);
+  });
+
   it("rejects broken event dependencies", () => {
     const result = validateSpec({
       ...validSpec,

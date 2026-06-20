@@ -142,7 +142,7 @@ export const inferenceEnvelopeSchema = {
               properties: {
                 formats: {
                   type: "array",
-                  items: { type: "string", enum: ["csv", "jsonl", "manifest"] },
+                  items: { type: "string", enum: ["csv", "jsonl", "manifest", "sql"] },
                 },
               },
             },
@@ -184,4 +184,3 @@ function fieldSchema(): object {
     },
   };
 }
-

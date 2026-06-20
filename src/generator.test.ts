@@ -91,6 +91,62 @@ describe("generateData", () => {
     await expect(stat(path.join(outDir, "entities", "order.csv"))).rejects.toThrow();
   });
 
+  it("writes SQL inserts in dependency order when sql output is selected", async () => {
+    const outDir = await mkdtemp(path.join(os.tmpdir(), "dds-sql-"));
+    const result = await generateData({
+      spec: { ...spec, outputs: { formats: ["sql", "manifest"] } },
+      seed: 42,
+      outDir,
+    });
+
+    expect(result.files).toEqual(["manifest.json", "seed.sql"]);
+    await expect(stat(path.join(outDir, "events.jsonl"))).rejects.toThrow();
+    await expect(stat(path.join(outDir, "entities", "order.csv"))).rejects.toThrow();
+
+    const sql = await readFile(path.join(outDir, "seed.sql"), "utf8");
+    expect(sql).toContain('INSERT INTO "buyer"');
+    expect(sql).toContain('INSERT INTO "order"');
+    expect(sql).toContain('INSERT INTO "events"');
+    expect(sql).toContain('INSERT INTO "metrics_daily"');
+    expect(sql.indexOf('INSERT INTO "buyer"')).toBeLessThan(sql.indexOf('INSERT INTO "order"'));
+    expect(sql.indexOf('INSERT INTO "order"')).toBeLessThan(sql.indexOf('INSERT INTO "events"'));
+    expect(sql).toContain("'buyer_");
+  });
+
+  it("orders SQL inserts from ref fields when relationships are omitted", async () => {
+    const outDir = await mkdtemp(path.join(os.tmpdir(), "dds-sql-ref-"));
+    const sqlSpec: SimulatorSpec = {
+      ...spec,
+      entities: [
+        {
+          name: "invoice",
+          count: 1,
+          fields: [
+            { name: "id", type: "id" },
+            { name: "user_id", type: "ref:user" },
+          ],
+        },
+        {
+          name: "user",
+          count: 1,
+          fields: [
+            { name: "id", type: "id" },
+            { name: "name", type: "string" },
+          ],
+        },
+      ],
+      relationships: undefined,
+      events: [{ name: "invoice_created", sourceEntity: "invoice" }],
+      metrics: [],
+      outputs: { formats: ["sql"] },
+    };
+
+    await generateData({ spec: sqlSpec, seed: 42, outDir });
+
+    const sql = await readFile(path.join(outDir, "seed.sql"), "utf8");
+    expect(sql.indexOf('INSERT INTO "user"')).toBeLessThan(sql.indexOf('INSERT INTO "invoice"'));
+  });
+
   it("preserves event sequence order for each source row", async () => {
     const outDir = await mkdtemp(path.join(os.tmpdir(), "dds-sequence-"));
     await generateData({
