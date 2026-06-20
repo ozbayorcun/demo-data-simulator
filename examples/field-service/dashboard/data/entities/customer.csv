@@ -1,9 +1,9 @@
 id,name,segment
-customer_1,Pioneer Homes,residential
-customer_2,Evergreen Services,commercial
-customer_3,Summit Facilities,residential
-customer_4,Bluebird Facilities,commercial
-customer_5,Bluebird Partners,commercial
-customer_6,Bluebird Works,residential
-customer_7,Northstar Services,commercial
-customer_8,Brightline Works,residential
+customer_1,Summit Works,residential
+customer_2,Evergreen Facilities,commercial
+customer_3,Summit Partners,residential
+customer_4,Northstar Partners,commercial
+customer_5,Harbor Group,commercial
+customer_6,Northstar Works,residential
+customer_7,Brightline Homes,commercial
+customer_8,Northstar Logistics,residential

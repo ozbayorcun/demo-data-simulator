@@ -78,7 +78,7 @@ function generateEntityRows(spec: SimulatorSpec, entity: EntitySpec, seed: strin
   for (let index = 0; index < entity.count; index += 1) {
     const row: Record<string, unknown> = {};
     for (const field of entity.fields) {
-      row[field.name] = generateFieldValue(spec, field, rng, entity.name, index);
+      row[field.name] = generateFieldValue(spec, field, rng, entity.name, index, seed);
     }
     rows.push(row);
   }
@@ -121,9 +121,10 @@ function generateFieldValue(
   rng: Rng,
   entityName: string,
   index: number,
+  seed: string | number,
 ): unknown {
   if (field.type === "id") return `${entityName}_${index + 1}`;
-  if (field.type === "string") return generateStringValue(spec, field, entityName, index);
+  if (field.type === "string") return generateStringValue(spec, field, entityName, index, seed);
   if (field.type === "integer") return rng.integer(field.min ?? 1, field.max ?? 100);
   if (field.type === "number") return Number((rng.integer(field.min ?? 1, field.max ?? 1000) / 10).toFixed(1));
   if (field.type === "boolean") return rng.next() >= 0.5;
@@ -142,11 +143,12 @@ function generateStringValue(
   field: FieldSpec,
   entityName: string,
   index: number,
+  seed: string | number,
 ): string {
   const fieldName = normalizedName(field.name);
   const entity = normalizedName(entityName);
   const domain = normalizedName(spec.domain);
-  const localRng = new Rng(`${spec.domain}:${entityName}:${field.name}:${index}`);
+  const localRng = new Rng(`${seed}:${spec.domain}:${entityName}:${field.name}:${index}`);
 
   if (fieldName === "name" || fieldName.endsWith("name")) {
     if (/(company|customer|account|vendor|supplier|merchant|brand|client)/.test(entity)) {
@@ -197,7 +199,8 @@ function generateEnumValue(field: FieldSpec, rng: Rng, index: number): string {
   const values = field.values ?? ["unknown"];
   if (values.length === 0) return "unknown";
   if (/(status|state|stage|phase)/.test(normalizedName(field.name))) {
-    return values[Math.min(index, values.length - 1)];
+    if (index < values.length) return values[index];
+    return rng.pick(values);
   }
   return rng.pick(values);
 }
@@ -230,7 +233,7 @@ function generateEvents(
           ),
         };
         for (const field of event.fields ?? []) {
-          row[field.name] = generateFieldValue(spec, field, rng, event.name, sourceIndex + eventIndex);
+          row[field.name] = generateFieldValue(spec, field, rng, event.name, sourceIndex + eventIndex, seed);
         }
         events.push(row);
       }
