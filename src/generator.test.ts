@@ -113,6 +113,40 @@ describe("generateData", () => {
     expect(sql).toContain("'buyer_");
   });
 
+  it("orders SQL inserts from ref fields when relationships are omitted", async () => {
+    const outDir = await mkdtemp(path.join(os.tmpdir(), "dds-sql-ref-"));
+    const sqlSpec: SimulatorSpec = {
+      ...spec,
+      entities: [
+        {
+          name: "invoice",
+          count: 1,
+          fields: [
+            { name: "id", type: "id" },
+            { name: "user_id", type: "ref:user" },
+          ],
+        },
+        {
+          name: "user",
+          count: 1,
+          fields: [
+            { name: "id", type: "id" },
+            { name: "name", type: "string" },
+          ],
+        },
+      ],
+      relationships: undefined,
+      events: [{ name: "invoice_created", sourceEntity: "invoice" }],
+      metrics: [],
+      outputs: { formats: ["sql"] },
+    };
+
+    await generateData({ spec: sqlSpec, seed: 42, outDir });
+
+    const sql = await readFile(path.join(outDir, "seed.sql"), "utf8");
+    expect(sql.indexOf('INSERT INTO "user"')).toBeLessThan(sql.indexOf('INSERT INTO "invoice"'));
+  });
+
   it("preserves event sequence order for each source row", async () => {
     const outDir = await mkdtemp(path.join(os.tmpdir(), "dds-sequence-"));
     await generateData({

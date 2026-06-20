@@ -220,6 +220,13 @@ function orderedEntitiesForOutput(spec: SimulatorSpec): EntitySpec[] {
       dependencies.get(relationship.from)?.add(relationship.to);
     }
   }
+  for (const entity of spec.entities) {
+    for (const field of entity.fields) {
+      if (!field.type.startsWith("ref:")) continue;
+      const target = field.type.slice("ref:".length);
+      if (entitiesByName.has(target)) dependencies.get(entity.name)?.add(target);
+    }
+  }
 
   const output: EntitySpec[] = [];
   const temporary = new Set<string>();
