@@ -64,7 +64,7 @@ export interface MetricSpec {
 }
 
 export interface OutputSpec {
-  formats: Array<"csv" | "jsonl" | "manifest">;
+  formats: Array<"csv" | "jsonl" | "manifest" | "sql">;
 }
 
 export interface SimulatorSpec {
@@ -116,4 +116,3 @@ export interface InferenceEnvelope {
   spec?: SimulatorSpec;
   error?: string;
 }
-

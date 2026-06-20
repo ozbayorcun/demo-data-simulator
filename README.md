@@ -6,7 +6,7 @@
 
 Agent-inferred demo data for business workflow apps.
 
-`demo-data-simulator` lets Codex, Claude Code, or another local agent infer how your app works, then turns that inference into deterministic CSV and JSONL data.
+`demo-data-simulator` lets Codex, Claude Code, or another local agent infer how your app works, then turns that inference into deterministic CSV, JSONL, and optional SQL seed data.
 
 The split is deliberate:
 
@@ -42,6 +42,7 @@ Outputs:
 - `demo-data/entities/*.csv`
 - `demo-data/events.jsonl`
 - `demo-data/metrics_daily.csv`
+- `demo-data/seed.sql`
 - `demo-data/manifest.json`
 
 For a quick visual proof, see the synthetic field-service dashboard example in
@@ -96,9 +97,16 @@ The generated output is intentionally boring and useful:
 - linked entity tables in `entities/*.csv`
 - event history in `events.jsonl`
 - daily metrics in `metrics_daily.csv`
+- optional SQL inserts in `seed.sql`
 - a reproducibility manifest in `manifest.json`
 
 The generated rows are deterministic for the same spec and seed.
+
+Use CSV when you want spreadsheet-friendly entity tables or fixtures, JSONL when
+you want append-style event streams for dashboards and agent evaluations, and SQL
+when you want to seed a relational database directly. SQL inserts are written in
+dependency order: referenced entity rows first, dependent entity rows next, then
+events and daily metrics.
 
 ## Why Not Faker?
 
@@ -125,7 +133,7 @@ This package keeps the agent on the part it is good at: reading bounded evidence
 - a strict JSON inference contract
 - spec validation
 - deterministic seeded generation
-- CSV/JSONL writers
+- CSV/JSONL/SQL writers
 - CI-friendly commands
 
 That means the same inferred spec can be reviewed, committed, regenerated, and tested without asking an LLM to recreate rows every time.
@@ -191,7 +199,7 @@ The built-in Codex preset is run with a read-only sandbox. Custom `--agent-cmd` 
 
 ## Spec
 
-MVP specs are JSON only and use `schemaVersion: "simulator.v1"`. A spec defines entities, fields, relationships, events, scenarios, metrics, and outputs.
+MVP specs are JSON only and use `schemaVersion: "simulator.v1"`. A spec defines entities, fields, relationships, events, scenarios, metrics, and outputs. Set `outputs.formats` to any mix of `csv`, `jsonl`, `sql`, and `manifest`.
 
 See `examples/specs/field-service.simulator.spec.json`.
 

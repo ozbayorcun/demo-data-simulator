@@ -91,6 +91,28 @@ describe("generateData", () => {
     await expect(stat(path.join(outDir, "entities", "order.csv"))).rejects.toThrow();
   });
 
+  it("writes SQL inserts in dependency order when sql output is selected", async () => {
+    const outDir = await mkdtemp(path.join(os.tmpdir(), "dds-sql-"));
+    const result = await generateData({
+      spec: { ...spec, outputs: { formats: ["sql", "manifest"] } },
+      seed: 42,
+      outDir,
+    });
+
+    expect(result.files).toEqual(["manifest.json", "seed.sql"]);
+    await expect(stat(path.join(outDir, "events.jsonl"))).rejects.toThrow();
+    await expect(stat(path.join(outDir, "entities", "order.csv"))).rejects.toThrow();
+
+    const sql = await readFile(path.join(outDir, "seed.sql"), "utf8");
+    expect(sql).toContain('INSERT INTO "buyer"');
+    expect(sql).toContain('INSERT INTO "order"');
+    expect(sql).toContain('INSERT INTO "events"');
+    expect(sql).toContain('INSERT INTO "metrics_daily"');
+    expect(sql.indexOf('INSERT INTO "buyer"')).toBeLessThan(sql.indexOf('INSERT INTO "order"'));
+    expect(sql.indexOf('INSERT INTO "order"')).toBeLessThan(sql.indexOf('INSERT INTO "events"'));
+    expect(sql).toContain("'buyer_");
+  });
+
   it("preserves event sequence order for each source row", async () => {
     const outDir = await mkdtemp(path.join(os.tmpdir(), "dds-sequence-"));
     await generateData({

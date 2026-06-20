@@ -246,7 +246,7 @@ export function validateSpec(value: unknown): ValidationResult {
   }
 
   for (const format of spec.outputs?.formats ?? []) {
-    if (!["csv", "jsonl", "manifest"].includes(format)) {
+    if (!["csv", "jsonl", "manifest", "sql"].includes(format)) {
       errors.push(`Unsupported output format ${String(format)}.`);
     }
   }
