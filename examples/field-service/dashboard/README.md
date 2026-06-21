@@ -10,6 +10,14 @@ The dashboard reads:
 
 - `data/events.jsonl`
 - `data/metrics_daily.csv`
+- `data/manifest.json`
+
+Run the local smoke proof to verify the dashboard assets and deterministic data
+load from a loopback-only server:
+
+```bash
+npm run smoke:field-service-dashboard
+```
 
 Serve it from the repo root to preview:
 

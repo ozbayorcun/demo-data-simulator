@@ -1,9 +1,10 @@
 const numberFormat = new Intl.NumberFormat("en-US");
 const percentFormat = new Intl.NumberFormat("en-US", { style: "percent", maximumFractionDigits: 0 });
 
-const [eventsText, metricsText] = await Promise.all([
+const [eventsText, metricsText, manifest] = await Promise.all([
   fetch("./data/events.jsonl").then((response) => response.text()),
   fetch("./data/metrics_daily.csv").then((response) => response.text()),
+  fetch("./data/manifest.json").then((response) => response.json()),
 ]);
 
 const events = eventsText
@@ -20,7 +21,11 @@ const completedMetrics = metrics
 const completedEvents = events.filter((event) => event.event_name === "work_order_completed");
 const firstTimeFixCount = completedEvents.filter((event) => event.first_time_fix === true).length;
 const eventCounts = countBy(events, (event) => event.event_name);
+const manifestRows = manifest.rows ?? {};
 
+document.querySelector("#source-proof").textContent = `${manifest.domain} · seed ${manifest.seed} · ${
+  manifestRows["events.jsonl"] ?? events.length
+} events`;
 document.querySelector("#total-events").textContent = numberFormat.format(events.length);
 document.querySelector("#completed-orders").textContent = numberFormat.format(
   completedMetrics.reduce((sum, row) => sum + row.value, 0),
