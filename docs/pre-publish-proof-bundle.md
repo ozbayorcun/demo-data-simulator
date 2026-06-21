@@ -141,9 +141,13 @@ the package; npm-side package/account setup remains an operator decision.
 
 ```bash
 npx demo-data-simulator --help
+npx demo-data-simulator init --project .
 npx demo-data-simulator validate --spec simulator.spec.json
 npx demo-data-simulator generate --spec simulator.spec.json --seed 42 --out demo-data
 ```
+
+The `init` step creates the sample `simulator.spec.json` that the clean-directory
+`validate` and `generate` commands read.
 
 - After publish, complete the packaged agent-skill verification tracked in issue
   #2.
