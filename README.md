@@ -37,6 +37,14 @@ dds validate --spec simulator.spec.json
 dds generate --spec simulator.spec.json --seed 42 --out demo-data
 ```
 
+Start from a built-in scenario pack when you want a reviewed demo shape without repo inference:
+
+```bash
+npx demo-data-simulator init --pack field-service --project .
+npx demo-data-simulator generate --spec simulator.spec.json --seed field-service-demo --out demo-data
+npx demo-data-simulator proof --spec simulator.spec.json --data demo-data --out demo-data/proof.md
+```
+
 Outputs:
 
 - `demo-data/entities/*.csv`
@@ -44,6 +52,7 @@ Outputs:
 - `demo-data/metrics_daily.csv`
 - `demo-data/seed.sql`
 - `demo-data/manifest.json`
+- `demo-data/proof.md` when proof generation is requested
 
 For a quick visual proof, see the synthetic field-service dashboard example in
 `examples/field-service/dashboard/`. It reads generated `events.jsonl` and
@@ -99,6 +108,7 @@ The generated output is intentionally boring and useful:
 - daily metrics in `metrics_daily.csv`
 - optional SQL inserts in `seed.sql`
 - a reproducibility manifest in `manifest.json`
+- optional proof reports in Markdown and JSON
 
 The generated rows are deterministic for the same spec and seed.
 

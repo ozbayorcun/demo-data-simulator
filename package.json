@@ -29,6 +29,7 @@
     "examples/field-service/test",
     "examples/specs",
     "scripts/smoke-field-service-dashboard.mjs",
+    "scripts/smoke-scenario-pack-proof.mjs",
     "skills"
   ],
   "scripts": {
@@ -37,6 +38,7 @@
     "prepack": "npm run build",
     "smoke:field-service-dashboard": "node scripts/smoke-field-service-dashboard.mjs",
     "smoke:pack": "node scripts/smoke-pack-install.mjs",
+    "smoke:scenario-proof": "npm run build && node scripts/smoke-scenario-pack-proof.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
