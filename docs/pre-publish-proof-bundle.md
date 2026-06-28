@@ -132,6 +132,10 @@ The workflow has `id-token: write`, matching the provenance intent in
 `publishConfig`. This does not prove npm trusted publishing is configured for
 the package; npm-side package/account setup remains an operator decision.
 
+For the current automated release process, including the exact trusted publisher
+settings required after the `v0.2.0` tag workflow failure, see
+`docs/release-runbook.md`.
+
 ## Remaining Publish Gates
 
 - Orcun must explicitly approve initial npm package creation/publish.
