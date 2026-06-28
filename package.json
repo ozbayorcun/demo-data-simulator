@@ -1,6 +1,6 @@
 {
   "name": "demo-data-simulator",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Infer business workflow data models from a repo, then generate deterministic demo CSV/JSONL locally.",
   "type": "module",
   "homepage": "https://github.com/ozbayorcun/demo-data-simulator#readme",
