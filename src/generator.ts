@@ -40,7 +40,7 @@ export async function generateData(options: GenerateOptions): Promise<GenerateRe
   }
 
   const events = generateEvents(spec, entityRows, options.seed);
-  const metrics = formats.has("csv") || formats.has("sql") ? generateMetrics(spec, events) : [];
+  const metrics = formats.has("csv") || formats.has("sql") ? generateMetrics(spec, events, entityRows) : [];
   if (formats.has("jsonl")) {
     const eventsFile = path.join(outDir, "events.jsonl");
     await writeJsonl(eventsFile, events);
@@ -272,15 +272,24 @@ function orderedTimestampFor(
   return new Date(orderedTimestamp).toISOString();
 }
 
-function generateMetrics(spec: SimulatorSpec, events: Array<Record<string, unknown>>): Array<Record<string, unknown>> {
+function generateMetrics(
+  spec: SimulatorSpec,
+  events: Array<Record<string, unknown>>,
+  entityRows: Map<string, Array<Record<string, unknown>>>,
+): Array<Record<string, unknown>> {
   const byDay = new Map<string, Map<string, number>>();
+  const eventsByDay = new Map<string, Array<Record<string, unknown>>>();
   for (const event of events) {
     const day = String(event.occurred_at).slice(0, 10);
     const eventName = String(event.event_name);
     const counts = byDay.get(day) ?? new Map<string, number>();
     counts.set(eventName, (counts.get(eventName) ?? 0) + 1);
     byDay.set(day, counts);
+    const dayEvents = eventsByDay.get(day) ?? [];
+    dayEvents.push(event);
+    eventsByDay.set(day, dayEvents);
   }
+  const sourceRowsById = sourceRowsByEntityAndId(entityRows);
 
   const metricRows: Array<Record<string, unknown>> = [];
   for (const day of [...byDay.keys()].sort()) {
@@ -289,12 +298,55 @@ function generateMetrics(spec: SimulatorSpec, events: Array<Record<string, unkno
       metricRows.push({ day, metric: `${eventName}_count`, value: count, unit: "events" });
     }
     for (const metric of spec.metrics ?? []) {
-      const dependsOn = metric.dependsOn?.[0];
-      const value = dependsOn ? counts.get(dependsOn) ?? 0 : events.length;
+      const value = metricValue(metric.expression, metric.dependsOn ?? [], counts, eventsByDay.get(day) ?? [], sourceRowsById, events.length);
       metricRows.push({ day, metric: metric.name, value, unit: metric.unit ?? "count" });
     }
   }
   return metricRows.sort((left, right) => String(left.day).localeCompare(String(right.day)) || String(left.metric).localeCompare(String(right.metric)));
+}
+
+function metricValue(
+  expression: string,
+  dependencies: string[],
+  counts: Map<string, number>,
+  dayEvents: Array<Record<string, unknown>>,
+  sourceRowsById: Map<string, Map<string, Record<string, unknown>>>,
+  totalEvents: number,
+): number {
+  const sumExpression = expression.match(/^sum\(([^.()]+)\.([^.()]+)\)$/);
+  if (sumExpression) {
+    const [, entityName, fieldName] = sumExpression;
+    const dependencyFilter = new Set(dependencies);
+    const entityRows = sourceRowsById.get(entityName);
+    if (!entityRows) return 0;
+    return Number(
+      dayEvents
+        .filter((event) => String(event.source_entity) === entityName)
+        .filter((event) => dependencyFilter.size === 0 || dependencyFilter.has(String(event.event_name)))
+        .reduce((total, event) => {
+          const sourceRow = entityRows.get(String(event.source_id));
+          const value = sourceRow?.[fieldName];
+          return total + (typeof value === "number" && Number.isFinite(value) ? value : 0);
+        }, 0)
+        .toFixed(6),
+    );
+  }
+
+  const dependency = dependencies[0];
+  return dependency ? counts.get(dependency) ?? 0 : totalEvents;
+}
+
+function sourceRowsByEntityAndId(entityRows: Map<string, Array<Record<string, unknown>>>): Map<string, Map<string, Record<string, unknown>>> {
+  const rowsByEntity = new Map<string, Map<string, Record<string, unknown>>>();
+  for (const [entityName, rows] of entityRows.entries()) {
+    const byId = new Map<string, Record<string, unknown>>();
+    for (const row of rows) {
+      const id = row.id ?? row[`${entityName}_id`];
+      if (id !== undefined && id !== null) byId.set(String(id), row);
+    }
+    rowsByEntity.set(entityName, byId);
+  }
+  return rowsByEntity;
 }
 
 function timestampFor(spec: SimulatorSpec, index: number, rng: Rng): string {

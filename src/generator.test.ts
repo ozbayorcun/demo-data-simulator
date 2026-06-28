@@ -184,6 +184,41 @@ describe("generateData", () => {
     await expect(stat(path.join(outDir, "entities", "order.csv"))).rejects.toThrow();
   });
 
+  it("sums source entity fields for sum metrics", async () => {
+    const outDir = await mkdtemp(path.join(os.tmpdir(), "dds-sum-metric-"));
+    await generateData({
+      spec: {
+        ...spec,
+        defaults: { ...spec.defaults, days: 1 },
+        entities: [
+          {
+            name: "opportunity",
+            count: 2,
+            fields: [
+              { name: "id", type: "id" },
+              { name: "amount", type: "number", min: 100, max: 100 },
+            ],
+          },
+        ],
+        relationships: [],
+        events: [{ name: "opportunity_created", sourceEntity: "opportunity" }],
+        metrics: [
+          {
+            name: "pipeline_value",
+            expression: "sum(opportunity.amount)",
+            dependsOn: ["opportunity_created"],
+            unit: "usd",
+          },
+        ],
+      },
+      seed: 42,
+      outDir,
+    });
+
+    const metrics = await readFile(path.join(outDir, "metrics_daily.csv"), "utf8");
+    expect(metrics).toContain("2026-01-01,pipeline_value,usd,20");
+  });
+
   it("writes SQL inserts in dependency order when sql output is selected", async () => {
     const outDir = await mkdtemp(path.join(os.tmpdir(), "dds-sql-"));
     const result = await generateData({
