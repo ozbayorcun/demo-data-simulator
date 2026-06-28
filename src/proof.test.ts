@@ -29,8 +29,17 @@ describe("generateProofReport", () => {
       expectedMinimumRows: 30,
       actualRows: 30,
     });
+    expect(report.coverage.edgeCases).toContainEqual(
+      expect.objectContaining({
+        scenario: "overdue-work",
+        target: "entity:work_order.status=overdue",
+        count: expect.any(Number),
+      }),
+    );
+    expect(report.coverage.edgeCases.every((edgeCase) => edgeCase.count > 0)).toBe(true);
 
     await expect(readFile(markdownOut, "utf8")).resolves.toContain("# field-service Proof Report");
+    await expect(readFile(markdownOut, "utf8")).resolves.toContain("## Edge Cases");
     await expect(readJson(jsonOut)).resolves.toMatchObject({ schemaVersion: "proof.v1", ok: true });
   });
 

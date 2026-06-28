@@ -25,6 +25,7 @@ export interface ProofReport {
     events: Array<{ name: string; expectedMinimumRows: number; actualRows: number }>;
     metrics: { expected: number; actualRows: number };
     scenarios: Array<{ name: string; present: boolean }>;
+    edgeCases: Array<{ scenario: string; target: string; count: number; detail: string }>;
   };
   constraints: Array<{ name: string; ok: boolean; detail: string }>;
   syntheticBoundary: string;
@@ -94,6 +95,7 @@ export async function generateProofReport(options: ProofOptions): Promise<ProofR
         actualRows: metricsRows.length,
       },
       scenarios: (options.spec.scenarios ?? []).map((scenario) => ({ name: scenario.name, present: true })),
+      edgeCases: edgeCaseCoverage(options.spec, entityRows, events),
     },
     constraints,
     syntheticBoundary:
@@ -152,6 +154,18 @@ export function renderProofMarkdown(report: ProofReport): string {
       "",
     );
   }
+  if (report.coverage.edgeCases.length > 0) {
+    lines.splice(
+      lines.indexOf("## Constraints"),
+      0,
+      "## Edge Cases",
+      "",
+      "| Scenario | Target | Supporting Rows/Events |",
+      "| --- | --- | ---: |",
+      ...report.coverage.edgeCases.map((edgeCase) => `| ${edgeCase.scenario} | ${edgeCase.target} | ${edgeCase.count} |`),
+      "",
+    );
+  }
   return `${lines.join("\n")}\n`;
 }
 
@@ -201,6 +215,43 @@ function eventSourceConstraints(
           : `${missing.length} event row(s) reference missing ${event.sourceEntity} row(s).`,
     };
   });
+}
+
+function edgeCaseCoverage(
+  spec: SimulatorSpec,
+  entityRows: Map<string, Array<Record<string, string>>>,
+  events: Array<Record<string, unknown>>,
+): Array<{ scenario: string; target: string; count: number; detail: string }> {
+  return (spec.scenarios ?? []).flatMap((scenario) =>
+    (scenario.effects ?? []).map((effect) => {
+      const count = countEffectTarget(effect.target, entityRows, events);
+      return {
+        scenario: scenario.name,
+        target: effect.target,
+        count,
+        detail: effect.description ?? `Detected ${count} supporting row(s) or event(s).`,
+      };
+    }),
+  );
+}
+
+function countEffectTarget(
+  target: string,
+  entityRows: Map<string, Array<Record<string, string>>>,
+  events: Array<Record<string, unknown>>,
+): number {
+  if (target.startsWith("event:")) {
+    const eventName = target.slice("event:".length);
+    return events.filter((event) => event.event_name === eventName).length;
+  }
+
+  const entityMatch = /^entity:([^.]+)\.([^=]+)=(.+)$/.exec(target);
+  if (entityMatch) {
+    const [, entityName, fieldName, expectedValue] = entityMatch;
+    return (entityRows.get(entityName) ?? []).filter((row) => row[fieldName] === expectedValue).length;
+  }
+
+  return 0;
 }
 
 function requestedFilesPresent(spec: SimulatorSpec, files: string[]): boolean {

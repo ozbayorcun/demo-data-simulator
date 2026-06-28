@@ -43,6 +43,18 @@ assert(
   proof.coverage.events.some((event) => event.name === "work_order_completed" && event.actualRows === 30),
   "proof.json should include completed work order coverage",
 );
+for (const scenario of [
+  "overdue-work",
+  "reassignment",
+  "missed-appointment",
+  "high-priority-customer",
+  "technician-capacity-pressure",
+]) {
+  assert(
+    proof.coverage.edgeCases.some((edgeCase) => edgeCase.scenario === scenario && edgeCase.count > 0),
+    `proof.json should include supporting rows or events for ${scenario}`,
+  );
+}
 
 console.log("Scenario pack proof smoke passed.");
 console.log(`- Initialized field-service pack in ${projectDir}`);

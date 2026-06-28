@@ -46,6 +46,11 @@ const fieldServicePack: ScenarioPack = {
           { name: "customer_id", type: "ref:customer", required: true },
           { name: "technician_id", type: "ref:technician", required: true },
           { name: "priority", type: "enum", values: ["low", "normal", "urgent"] },
+          {
+            name: "status",
+            type: "enum",
+            values: ["completed", "overdue", "reassigned", "missed_appointment", "high_priority", "capacity_pressure"],
+          },
           { name: "created_at", type: "timestamp" },
         ],
       },
@@ -76,6 +81,41 @@ const fieldServicePack: ScenarioPack = {
         dependsOn: ["work_order_scheduled"],
         fields: [{ name: "first_time_fix", type: "boolean" }],
       },
+      {
+        name: "work_order_delayed",
+        sourceEntity: "work_order",
+        countPerEntity: 1,
+        sequence: 4,
+        dependsOn: ["work_order_scheduled"],
+      },
+      {
+        name: "work_order_reassigned",
+        sourceEntity: "work_order",
+        countPerEntity: 1,
+        sequence: 5,
+        dependsOn: ["work_order_scheduled"],
+      },
+      {
+        name: "work_order_missed_appointment",
+        sourceEntity: "work_order",
+        countPerEntity: 1,
+        sequence: 6,
+        dependsOn: ["work_order_scheduled"],
+      },
+      {
+        name: "work_order_escalated",
+        sourceEntity: "work_order",
+        countPerEntity: 1,
+        sequence: 7,
+        dependsOn: ["work_order_created"],
+      },
+      {
+        name: "technician_capacity_pressure",
+        sourceEntity: "work_order",
+        countPerEntity: 1,
+        sequence: 8,
+        dependsOn: ["work_order_scheduled"],
+      },
     ],
     scenarios: [
       {
@@ -83,6 +123,56 @@ const fieldServicePack: ScenarioPack = {
         description: "Balanced demand with normal completion flow.",
         startsOnDay: 1,
         endsOnDay: 14,
+      },
+      {
+        name: "overdue-work",
+        description: "A work order misses its expected service window.",
+        startsOnDay: 2,
+        endsOnDay: 5,
+        effects: [
+          { target: "entity:work_order.status=overdue", description: "Rows marked as overdue work." },
+          { target: "event:work_order_delayed", description: "Delay events show overdue workflow movement." },
+        ],
+      },
+      {
+        name: "reassignment",
+        description: "A scheduled job is reassigned to another technician.",
+        startsOnDay: 3,
+        endsOnDay: 7,
+        effects: [
+          { target: "entity:work_order.status=reassigned", description: "Rows marked as reassigned work." },
+          { target: "event:work_order_reassigned", description: "Reassignment events show technician handoff." },
+        ],
+      },
+      {
+        name: "missed-appointment",
+        description: "A customer appointment is missed and needs follow-up.",
+        startsOnDay: 4,
+        endsOnDay: 8,
+        effects: [
+          { target: "entity:work_order.status=missed_appointment", description: "Rows marked as missed appointments." },
+          { target: "event:work_order_missed_appointment", description: "Missed appointment events show failed visit flow." },
+        ],
+      },
+      {
+        name: "high-priority-customer",
+        description: "Urgent customer work is escalated.",
+        startsOnDay: 1,
+        endsOnDay: 10,
+        effects: [
+          { target: "entity:work_order.status=high_priority", description: "Rows marked as high-priority work." },
+          { target: "event:work_order_escalated", description: "Escalation events show priority handling." },
+        ],
+      },
+      {
+        name: "technician-capacity-pressure",
+        description: "Technician capacity pressure creates operational strain.",
+        startsOnDay: 6,
+        endsOnDay: 14,
+        effects: [
+          { target: "entity:work_order.status=capacity_pressure", description: "Rows marked as capacity-pressure work." },
+          { target: "event:technician_capacity_pressure", description: "Capacity pressure events show constrained operations." },
+        ],
       },
     ],
     metrics: [
