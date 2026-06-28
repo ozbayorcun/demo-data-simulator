@@ -16,8 +16,8 @@
     "provenance": true
   },
   "bin": {
-    "demo-data-simulator": "./dist/cli.js",
-    "dds": "./dist/cli.js"
+    "demo-data-simulator": "dist/cli.js",
+    "dds": "dist/cli.js"
   },
   "files": [
     "dist",
