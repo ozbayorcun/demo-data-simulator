@@ -189,7 +189,168 @@ const fieldServicePack: ScenarioPack = {
   },
 };
 
-const PACKS = new Map<string, ScenarioPack>([[fieldServicePack.id, fieldServicePack]]);
+const salesPipelinePack: ScenarioPack = {
+  id: "sales-pipeline",
+  description: "Opportunities move from lead capture through stage changes, expansion, and close outcomes.",
+  spec: {
+    schemaVersion: "simulator.v1",
+    domain: "sales-pipeline",
+    description: "B2B sales pipeline with accounts, opportunities, reps, stage changes, and pipeline metrics.",
+    defaults: {
+      days: 30,
+      startDate: "2026-02-01",
+      timezone: "UTC",
+      locale: "en-US",
+    },
+    entities: [
+      {
+        name: "account",
+        count: 12,
+        fields: [
+          { name: "id", type: "id", required: true },
+          { name: "name", type: "string", required: true },
+          { name: "segment", type: "enum", values: ["startup", "mid_market", "enterprise"] },
+          { name: "region", type: "enum", values: ["na", "emea", "apac"] },
+        ],
+      },
+      {
+        name: "sales_rep",
+        count: 4,
+        fields: [
+          { name: "id", type: "id", required: true },
+          { name: "name", type: "string", required: true },
+          { name: "territory", type: "enum", values: ["east", "west", "central", "international"] },
+        ],
+      },
+      {
+        name: "opportunity",
+        count: 36,
+        fields: [
+          { name: "id", type: "id", required: true },
+          { name: "account_id", type: "ref:account", required: true },
+          { name: "sales_rep_id", type: "ref:sales_rep", required: true },
+          { name: "deal_type", type: "enum", values: ["new_business", "expansion", "renewal"] },
+          { name: "stage", type: "enum", values: ["qualified", "demo", "proposal", "negotiation", "closed_won", "closed_lost", "stalled"] },
+          { name: "amount", type: "number", min: 5000, max: 150000 },
+          { name: "created_at", type: "timestamp" },
+        ],
+      },
+    ],
+    relationships: [
+      { from: "opportunity", to: "account", type: "many_to_one", field: "account_id" },
+      { from: "opportunity", to: "sales_rep", type: "many_to_one", field: "sales_rep_id" },
+    ],
+    events: [
+      { name: "opportunity_created", sourceEntity: "opportunity", countPerEntity: 1, sequence: 1 },
+      {
+        name: "opportunity_demo_completed",
+        sourceEntity: "opportunity",
+        countPerEntity: 1,
+        sequence: 2,
+        dependsOn: ["opportunity_created"],
+      },
+      {
+        name: "proposal_sent",
+        sourceEntity: "opportunity",
+        countPerEntity: 1,
+        sequence: 3,
+        dependsOn: ["opportunity_demo_completed"],
+      },
+      {
+        name: "deal_stalled",
+        sourceEntity: "opportunity",
+        countPerEntity: 1,
+        sequence: 4,
+        dependsOn: ["proposal_sent"],
+      },
+      {
+        name: "expansion_identified",
+        sourceEntity: "opportunity",
+        countPerEntity: 1,
+        sequence: 5,
+        dependsOn: ["opportunity_created"],
+      },
+      {
+        name: "opportunity_closed_won",
+        sourceEntity: "opportunity",
+        countPerEntity: 1,
+        sequence: 6,
+        dependsOn: ["proposal_sent"],
+      },
+      {
+        name: "opportunity_closed_lost",
+        sourceEntity: "opportunity",
+        countPerEntity: 1,
+        sequence: 7,
+        dependsOn: ["proposal_sent"],
+      },
+    ],
+    scenarios: [
+      {
+        name: "healthy-new-business",
+        description: "Qualified new-business opportunities move through demo, proposal, and close.",
+        startsOnDay: 1,
+        endsOnDay: 30,
+        effects: [
+          { target: "entity:opportunity.stage=closed_won", description: "Rows marked as won deals." },
+          { target: "event:opportunity_closed_won", description: "Closed-won events complete the successful sales flow." },
+        ],
+      },
+      {
+        name: "stalled-enterprise-deal",
+        description: "A larger enterprise opportunity slows down after proposal.",
+        startsOnDay: 7,
+        endsOnDay: 21,
+        effects: [
+          { target: "entity:opportunity.stage=stalled", description: "Rows marked as stalled pipeline." },
+          { target: "event:deal_stalled", description: "Stall events show delayed buyer progress." },
+        ],
+      },
+      {
+        name: "expansion-signal",
+        description: "Existing account activity creates expansion pipeline.",
+        startsOnDay: 10,
+        endsOnDay: 25,
+        effects: [
+          { target: "entity:opportunity.deal_type=expansion", description: "Rows marked as expansion opportunities." },
+          { target: "event:expansion_identified", description: "Expansion events show account growth signals." },
+        ],
+      },
+      {
+        name: "competitive-loss",
+        description: "Some qualified opportunities close lost after proposal.",
+        startsOnDay: 14,
+        endsOnDay: 30,
+        effects: [
+          { target: "entity:opportunity.stage=closed_lost", description: "Rows marked as lost opportunities." },
+          { target: "event:opportunity_closed_lost", description: "Closed-lost events show unsuccessful sales flow." },
+        ],
+      },
+    ],
+    metrics: [
+      {
+        name: "pipeline_value",
+        expression: "sum(opportunity.amount)",
+        dependsOn: ["opportunity_created"],
+        unit: "usd",
+      },
+      {
+        name: "closed_won_opportunities",
+        expression: "count(opportunity_closed_won)",
+        dependsOn: ["opportunity_closed_won"],
+        unit: "opportunities",
+      },
+    ],
+    outputs: {
+      formats: ["csv", "jsonl", "manifest"],
+    },
+  },
+};
+
+const PACKS = new Map<string, ScenarioPack>([
+  [fieldServicePack.id, fieldServicePack],
+  [salesPipelinePack.id, salesPipelinePack],
+]);
 
 export function listScenarioPackIds(): string[] {
   return [...PACKS.keys()].sort();

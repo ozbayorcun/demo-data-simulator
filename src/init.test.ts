@@ -32,11 +32,23 @@ describe("initProject", () => {
     expect(validateSpec(spec).ok).toBe(true);
   });
 
+  it("writes a valid sales pipeline scenario pack spec", async () => {
+    const project = await mkdtemp(path.join(os.tmpdir(), "dds-init-sales-pack-"));
+
+    await initProject(project, { pack: "sales-pipeline" });
+    const spec = JSON.parse(await readFile(path.join(project, "simulator.spec.json"), "utf8")) as SimulatorSpec;
+
+    expect(spec.domain).toBe("sales-pipeline");
+    expect(spec.entities.map((entity) => entity.name)).toEqual(["account", "sales_rep", "opportunity"]);
+    expect(spec.scenarios?.map((scenario) => scenario.name)).toContain("stalled-enterprise-deal");
+    expect(validateSpec(spec).ok).toBe(true);
+  });
+
   it("rejects unknown scenario packs with the available pack ids", async () => {
     const project = await mkdtemp(path.join(os.tmpdir(), "dds-init-unknown-pack-"));
 
     await expect(initProject(project, { pack: "retail-ops" })).rejects.toThrow(
-      'Unknown scenario pack "retail-ops". Available packs: field-service',
+      'Unknown scenario pack "retail-ops". Available packs: field-service, sales-pipeline',
     );
   });
 });
