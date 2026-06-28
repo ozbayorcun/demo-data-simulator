@@ -29,7 +29,7 @@ async function main(): Promise<void> {
   }
 
   if (args.command === "init") {
-    const written = await initProject(project);
+    const written = await initProject(project, { pack: getString(args.flags, "pack") });
     console.log(written.length ? `Wrote ${written.map((file) => path.relative(project, file)).join(", ")}` : "Already initialized.");
     return;
   }
@@ -109,6 +109,7 @@ function printHelp(): void {
 Usage:
   dds doctor --agent auto
   dds init --project .
+  dds init --pack field-service --project .
   dds infer --agent codex --project .
   dds infer --agent codex --project . --profile fast
   dds infer --agent claude --project .

@@ -1,9 +1,15 @@
 import path from "node:path";
 import { existsSync } from "node:fs";
 import { writeJson } from "./fs-utils.js";
+import { getScenarioPack, listScenarioPackIds } from "./packs.js";
+import { validateSpec } from "./spec.js";
 import type { SimulatorSpec } from "./types.js";
 
-export async function initProject(projectRoot: string): Promise<string[]> {
+export interface InitOptions {
+  pack?: string;
+}
+
+export async function initProject(projectRoot: string, options: InitOptions = {}): Promise<string[]> {
   const written: string[] = [];
   const configPath = path.join(projectRoot, "demo-data-simulator.config.json");
   if (!existsSync(configPath)) {
@@ -18,10 +24,25 @@ export async function initProject(projectRoot: string): Promise<string[]> {
 
   const specPath = path.join(projectRoot, "simulator.spec.json");
   if (!existsSync(specPath)) {
-    await writeJson(specPath, templateSpec());
+    await writeJson(specPath, specForInit(options));
     written.push(specPath);
   }
   return written;
+}
+
+function specForInit(options: InitOptions): SimulatorSpec {
+  if (!options.pack) return templateSpec();
+
+  const pack = getScenarioPack(options.pack);
+  if (!pack) {
+    throw new Error(`Unknown scenario pack "${options.pack}". Available packs: ${listScenarioPackIds().join(", ")}`);
+  }
+
+  const result = validateSpec(pack.spec);
+  if (!result.ok) {
+    throw new Error(`Built-in scenario pack "${options.pack}" is invalid: ${result.errors.join("; ")}`);
+  }
+  return pack.spec;
 }
 
 function templateSpec(): SimulatorSpec {
@@ -57,4 +78,3 @@ function templateSpec(): SimulatorSpec {
     },
   };
 }
-
