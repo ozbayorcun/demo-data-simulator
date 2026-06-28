@@ -61,6 +61,31 @@ npx demo-data-simulator generate --spec simulator.spec.json --seed field-service
 npx demo-data-simulator proof --spec simulator.spec.json --data demo-data --out demo-data/proof.md
 ```
 
+## Built-In Scenario Packs
+
+Use a pack when you want coherent synthetic data for a common workflow without
+waiting for agent inference.
+
+| Pack ID | Best For | Includes |
+| --- | --- | --- |
+| `field-service` | service operations demos and dispatch dashboards | customers, technicians, work orders, scheduling/completion events, overdue and capacity-pressure scenarios |
+| `sales-pipeline` | CRM, revenue operations, and sales dashboard demos | accounts, sales reps, opportunities, stage-change events, stalled deals, expansion signals, and close outcomes |
+| `recruiting-pipeline` | ATS, hiring, and people-ops workflow demos | candidates, jobs, recruiters, applications, interview events, offer acceptance, declined offers, and stalled loops |
+
+Recommended first-run commands:
+
+```bash
+npx demo-data-simulator init --pack sales-pipeline --project .
+npx demo-data-simulator generate --spec simulator.spec.json --seed sales-demo --out demo-data
+npx demo-data-simulator proof --spec simulator.spec.json --data demo-data --out demo-data/proof.md
+```
+
+```bash
+npx demo-data-simulator init --pack recruiting-pipeline --project .
+npx demo-data-simulator generate --spec simulator.spec.json --seed recruiting-demo --out demo-data
+npx demo-data-simulator proof --spec simulator.spec.json --data demo-data --out demo-data/proof.md
+```
+
 Outputs:
 
 - `demo-data/entities/*.csv`
