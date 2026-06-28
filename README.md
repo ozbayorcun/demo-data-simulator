@@ -1,10 +1,12 @@
-# demo-data-simulator
+# demo-data-simulator: synthetic demo data for workflow apps
 
 [![CI](https://github.com/ozbayorcun/demo-data-simulator/actions/workflows/ci.yml/badge.svg)](https://github.com/ozbayorcun/demo-data-simulator/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/demo-data-simulator.svg)](https://www.npmjs.com/package/demo-data-simulator)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node.js >=20](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](package.json)
 
-Agent-inferred demo data for business workflow apps.
+Generate deterministic synthetic demo data, seed data, fixtures, and dashboard
+data for SaaS and business workflow apps.
 
 `demo-data-simulator` lets Codex, Claude Code, or another local agent infer how your app works, then turns that inference into deterministic CSV, JSONL, and optional SQL seed data.
 
@@ -17,6 +19,20 @@ The split is deliberate:
 Use it when you need believable demo, seed, fixture, or dashboard data for a workflow/SaaS app without hand-writing every table and event stream.
 
 Requires Node.js 20+.
+
+## Best For
+
+- SaaS product demos that need coherent sample customers, accounts, work items, and events
+- local seed data for development and QA
+- analytics dashboards that need repeatable CSV and JSONL inputs
+- AI-agent evaluation fixtures with realistic workflow state
+- prototype environments where fake rows need to behave like an operating business
+
+## What Makes It Different
+
+Most fake-data tools generate fields. `demo-data-simulator` generates workflow
+data: linked entities, lifecycle events, daily metrics, and a reproducibility
+manifest that agree with each other for the same spec and seed.
 
 ## Try It In 60 Seconds
 
@@ -57,6 +73,14 @@ Outputs:
 For a quick visual proof, see the synthetic field-service dashboard example in
 `examples/field-service/dashboard/`. It reads generated `events.jsonl` and
 `metrics_daily.csv` files, and stays entirely local.
+
+## Public Repo Guide
+
+- User guide and quick start: this README
+- Field-service example app: `examples/field-service/`
+- Static dashboard example: `examples/field-service/dashboard/`
+- Maintainer docs index: `docs/README.md`
+- Release runbook: `docs/release-runbook.md`
 
 ## Infer From A Repo
 
