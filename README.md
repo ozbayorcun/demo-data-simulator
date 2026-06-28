@@ -175,7 +175,8 @@ npm run smoke:pack
 The smoke test runs `npm pack`, installs the generated tarball into a clean temporary project, then verifies the packaged `dds` binary can print help, validate a sample spec, and generate sample CSV/JSONL/manifest output. It does not publish to npm, configure trusted publishing, or change account settings.
 
 For the current local approval evidence and remaining npm gates, see
-`docs/pre-publish-proof-bundle.md`.
+`docs/pre-publish-proof-bundle.md`. For the automated tag release process and
+trusted publishing setup, see `docs/release-runbook.md`.
 
 ## Commands
 
