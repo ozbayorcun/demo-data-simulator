@@ -8,6 +8,7 @@ import { initProject } from "./init.js";
 import { validateSpec } from "./spec.js";
 import { generateData } from "./generator.js";
 import { explainSpec } from "./explain.js";
+import { generateProofReport } from "./proof.js";
 import { isEvidenceProfile } from "./evidence.js";
 import type { SimulatorSpec } from "./types.js";
 
@@ -87,6 +88,17 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (args.command === "proof") {
+    const spec = await loadSpec(args.flags);
+    const dataDir = path.resolve(getString(args.flags, "data", "demo-data") ?? "demo-data");
+    const markdownOut = getString(args.flags, "out", path.join(dataDir, "proof.md"));
+    const jsonOut = getString(args.flags, "json-out", path.join(dataDir, "proof.json"));
+    const report = await generateProofReport({ spec: spec as SimulatorSpec, dataDir, markdownOut, jsonOut });
+    console.log(`Proof ${report.ok ? "passed" : "failed"} for ${report.spec.domain}.`);
+    if (!report.ok) process.exitCode = 1;
+    return;
+  }
+
   if (args.command === "explain") {
     const spec = await loadSpec(args.flags);
     console.log(explainSpec(spec as SimulatorSpec));
@@ -116,6 +128,7 @@ Usage:
   dds infer --agent command --agent-cmd node --agent-arg examples/agents/field-service-agent.mjs --project .
   dds validate --spec simulator.spec.json
   dds generate --spec simulator.spec.json --seed 42 --out demo-data
+  dds proof --spec simulator.spec.json --data demo-data --out demo-data/proof.md
   dds explain --spec simulator.spec.json
 `);
 }
