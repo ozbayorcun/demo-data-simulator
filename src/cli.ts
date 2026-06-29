@@ -10,9 +10,11 @@ import { validateSpec } from "./spec.js";
 import { generateData } from "./generator.js";
 import { explainSpec } from "./explain.js";
 import { generateProofReport } from "./proof.js";
+import { diffProofReports, renderProofDiff } from "./proof-diff.js";
 import { isEvidenceProfile } from "./evidence.js";
 import { getScenarioPack, listScenarioPackIds, listScenarioPacks } from "./packs.js";
 import type { SimulatorSpec } from "./types.js";
+import type { ProofReport } from "./proof.js";
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
@@ -127,6 +129,23 @@ async function main(): Promise<void> {
   }
 
   if (args.command === "proof") {
+    if (args.positionals[0] === "diff") {
+      const baselinePath = getString(args.flags, "baseline");
+      const candidatePath = getString(args.flags, "candidate");
+      if (!baselinePath || !candidatePath) {
+        console.error("proof diff requires --baseline <proof.json> and --candidate <proof.json>.");
+        process.exitCode = 1;
+        return;
+      }
+
+      const baseline = await readJson<ProofReport>(path.resolve(baselinePath));
+      const candidate = await readJson<ProofReport>(path.resolve(candidatePath));
+      const diff = diffProofReports(baseline, candidate);
+      console.log(renderProofDiff(diff));
+      if (!diff.ok && !getBoolean(args.flags, "allow-differences")) process.exitCode = 1;
+      return;
+    }
+
     const spec = await loadSpec(args.flags);
     const dataDir = path.resolve(getString(args.flags, "data", "demo-data") ?? "demo-data");
     const markdownOut = getString(args.flags, "out", path.join(dataDir, "proof.md"));
@@ -170,6 +189,7 @@ Usage:
   dds lint --spec simulator.spec.json
   dds generate --spec simulator.spec.json --seed 42 --out demo-data
   dds proof --spec simulator.spec.json --data demo-data --out demo-data/proof.md
+  dds proof diff --baseline proof-before.json --candidate proof-after.json
   dds explain --spec simulator.spec.json
 `);
 }
