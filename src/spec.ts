@@ -273,8 +273,8 @@ function validateScenarios(
     if (scenarioNames.has(scenario.name)) errors.push(`Duplicate scenario: ${scenario.name}.`);
     scenarioNames.add(scenario.name);
 
-    const startsOnDay = scenario.startsOnDay;
-    const endsOnDay = scenario.endsOnDay;
+    const startsOnDay = scenario.startsOnDay ?? undefined;
+    const endsOnDay = scenario.endsOnDay ?? undefined;
     if (startsOnDay !== undefined && (!Number.isInteger(startsOnDay) || startsOnDay < 1)) {
       errors.push(`Scenario ${scenario.name} startsOnDay must be an integer >= 1.`);
     }
@@ -305,10 +305,12 @@ function validateScenarios(
       } else {
         errors.push(...validateScenarioEffectTarget(scenario.name, effect.target, spec, entityNames, eventNames));
       }
-      if (effect.metric !== undefined && !metricNames.has(effect.metric)) {
-        errors.push(`Scenario ${scenario.name} effect references missing metric ${effect.metric}.`);
+      const metric = effect.metric ?? undefined;
+      const multiplier = effect.multiplier ?? undefined;
+      if (metric !== undefined && !metricNames.has(metric)) {
+        errors.push(`Scenario ${scenario.name} effect references missing metric ${metric}.`);
       }
-      if (effect.multiplier !== undefined && (typeof effect.multiplier !== "number" || effect.multiplier <= 0)) {
+      if (multiplier !== undefined && (typeof multiplier !== "number" || multiplier <= 0)) {
         errors.push(`Scenario ${scenario.name} effect multiplier must be a positive number.`);
       }
     }

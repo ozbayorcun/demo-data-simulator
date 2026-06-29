@@ -141,6 +141,24 @@ describe("validateSpec", () => {
     expect(result.errors.join("\n")).toContain("multiplier must be a positive number");
   });
 
+  it("treats nullable scenario windows and effect options as absent", () => {
+    const result = validateSpec({
+      ...validSpec,
+      metrics: [{ name: "tickets", expression: "count(ticket_created)", dependsOn: ["ticket_created"] }],
+      scenarios: [
+        {
+          name: "schema-null-options",
+          startsOnDay: null,
+          endsOnDay: null,
+          effects: [{ target: "event:ticket_created", metric: null, multiplier: null }],
+        },
+      ],
+    } as unknown as SimulatorSpec);
+
+    expect(result.errors).toEqual([]);
+    expect(result.ok).toBe(true);
+  });
+
   it("rejects invalid scenario windows", () => {
     const result = validateSpec({
       ...validSpec,
