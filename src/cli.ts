@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import path from "node:path";
 import { readJson } from "./fs-utils.js";
+import { writeJson } from "./fs-utils.js";
 import { parseArgs, getBoolean, getPositiveInteger, getString, getStringArray } from "./args.js";
 import { doctorAgent, type AgentName } from "./agent.js";
 import { inferSpec } from "./infer.js";
@@ -10,6 +11,7 @@ import { generateData } from "./generator.js";
 import { explainSpec } from "./explain.js";
 import { generateProofReport } from "./proof.js";
 import { isEvidenceProfile } from "./evidence.js";
+import { getScenarioPack, listScenarioPackIds, listScenarioPacks } from "./packs.js";
 import type { SimulatorSpec } from "./types.js";
 
 async function main(): Promise<void> {
@@ -32,6 +34,42 @@ async function main(): Promise<void> {
   if (args.command === "init") {
     const written = await initProject(project, { pack: getString(args.flags, "pack") });
     console.log(written.length ? `Wrote ${written.map((file) => path.relative(project, file)).join(", ")}` : "Already initialized.");
+    return;
+  }
+
+  if (args.command === "pack") {
+    const action = args.positionals[0] ?? "list";
+    if (action === "list") {
+      for (const pack of listScenarioPacks()) {
+        console.log(`${pack.id}\t${pack.description}`);
+      }
+      return;
+    }
+
+    if (action === "export") {
+      const packId = getString(args.flags, "pack") ?? args.positionals[1];
+      if (!packId) {
+        console.error(`Missing --pack. Available packs: ${listScenarioPackIds().join(", ")}`);
+        process.exitCode = 1;
+        return;
+      }
+
+      const pack = getScenarioPack(packId);
+      if (!pack) {
+        console.error(`Unknown scenario pack "${packId}". Available packs: ${listScenarioPackIds().join(", ")}`);
+        process.exitCode = 1;
+        return;
+      }
+
+      const outPath = path.resolve(getString(args.flags, "out", `${pack.id}.simulator.spec.json`) ?? `${pack.id}.simulator.spec.json`);
+      await writeJson(outPath, pack.spec);
+      console.log(`Exported ${pack.id} scenario pack to ${outPath}`);
+      return;
+    }
+
+    console.error(`Unknown pack action: ${action}`);
+    printHelp();
+    process.exitCode = 1;
     return;
   }
 
@@ -122,6 +160,8 @@ Usage:
   dds doctor --agent auto
   dds init --project .
   dds init --pack field-service --project .
+  dds pack list
+  dds pack export --pack field-service --out field-service.simulator.spec.json
   dds infer --agent codex --project .
   dds infer --agent codex --project . --profile fast
   dds infer --agent claude --project .

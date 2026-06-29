@@ -514,6 +514,12 @@ export function listScenarioPackIds(): string[] {
   return [...PACKS.keys()].sort();
 }
 
+export function listScenarioPacks(): Array<Pick<ScenarioPack, "id" | "description">> {
+  return [...PACKS.values()]
+    .map((pack) => ({ id: pack.id, description: pack.description }))
+    .sort((left, right) => left.id.localeCompare(right.id));
+}
+
 export function getScenarioPack(id: string): ScenarioPack | undefined {
   const pack = PACKS.get(id);
   if (!pack) return undefined;

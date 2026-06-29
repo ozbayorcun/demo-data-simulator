@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { initProject } from "./init.js";
+import { getScenarioPack, listScenarioPacks } from "./packs.js";
 import { validateSpec } from "./spec.js";
 import type { SimulatorSpec } from "./types.js";
 
@@ -62,5 +63,31 @@ describe("initProject", () => {
     await expect(initProject(project, { pack: "retail-ops" })).rejects.toThrow(
       'Unknown scenario pack "retail-ops". Available packs: field-service, recruiting-pipeline, sales-pipeline',
     );
+  });
+
+  it("lists scenario packs in deterministic authoring order", () => {
+    expect(listScenarioPacks()).toEqual([
+      {
+        id: "field-service",
+        description: "Work orders move from customer request to technician completion.",
+      },
+      {
+        id: "recruiting-pipeline",
+        description: "Candidates move through applications, interviews, offers, and hiring outcomes.",
+      },
+      {
+        id: "sales-pipeline",
+        description: "Opportunities move from lead capture through stage changes, expansion, and close outcomes.",
+      },
+    ]);
+  });
+
+  it("returns cloned scenario pack specs for authoring edits", () => {
+    const first = getScenarioPack("sales-pipeline");
+    const second = getScenarioPack("sales-pipeline");
+
+    expect(first?.spec.domain).toBe("sales-pipeline");
+    first?.spec.entities.push({ name: "scratch", count: 1, fields: [{ name: "id", type: "id" }] });
+    expect(second?.spec.entities.map((entity) => entity.name)).toEqual(["account", "sales_rep", "opportunity"]);
   });
 });
