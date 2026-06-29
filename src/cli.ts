@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import path from "node:path";
 import { readJson } from "./fs-utils.js";
+import { writeJson } from "./fs-utils.js";
 import { parseArgs, getBoolean, getPositiveInteger, getString, getStringArray } from "./args.js";
 import { doctorAgent, type AgentName } from "./agent.js";
 import { inferSpec } from "./infer.js";
@@ -9,8 +10,11 @@ import { validateSpec } from "./spec.js";
 import { generateData } from "./generator.js";
 import { explainSpec } from "./explain.js";
 import { generateProofReport } from "./proof.js";
+import { diffProofReports, renderProofDiff } from "./proof-diff.js";
 import { isEvidenceProfile } from "./evidence.js";
+import { getScenarioPack, listScenarioPackIds, listScenarioPacks } from "./packs.js";
 import type { SimulatorSpec } from "./types.js";
+import type { ProofReport } from "./proof.js";
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
@@ -32,6 +36,42 @@ async function main(): Promise<void> {
   if (args.command === "init") {
     const written = await initProject(project, { pack: getString(args.flags, "pack") });
     console.log(written.length ? `Wrote ${written.map((file) => path.relative(project, file)).join(", ")}` : "Already initialized.");
+    return;
+  }
+
+  if (args.command === "pack") {
+    const action = args.positionals[0] ?? "list";
+    if (action === "list") {
+      for (const pack of listScenarioPacks()) {
+        console.log(`${pack.id}\t${pack.description}`);
+      }
+      return;
+    }
+
+    if (action === "export") {
+      const packId = getString(args.flags, "pack") ?? args.positionals[1];
+      if (!packId) {
+        console.error(`Missing --pack. Available packs: ${listScenarioPackIds().join(", ")}`);
+        process.exitCode = 1;
+        return;
+      }
+
+      const pack = getScenarioPack(packId);
+      if (!pack) {
+        console.error(`Unknown scenario pack "${packId}". Available packs: ${listScenarioPackIds().join(", ")}`);
+        process.exitCode = 1;
+        return;
+      }
+
+      const outPath = path.resolve(getString(args.flags, "out", `${pack.id}.simulator.spec.json`) ?? `${pack.id}.simulator.spec.json`);
+      await writeJson(outPath, pack.spec);
+      console.log(`Exported ${pack.id} scenario pack to ${outPath}`);
+      return;
+    }
+
+    console.error(`Unknown pack action: ${action}`);
+    printHelp();
+    process.exitCode = 1;
     return;
   }
 
@@ -60,7 +100,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  if (args.command === "validate") {
+  if (args.command === "validate" || args.command === "lint") {
     const spec = await loadSpec(args.flags);
     const result = validateSpec(spec);
     for (const warning of result.warnings) console.warn(`WARN ${warning}`);
@@ -69,7 +109,7 @@ async function main(): Promise<void> {
       process.exitCode = 1;
       return;
     }
-    console.log("Spec is valid.");
+    console.log(args.command === "lint" ? "Spec lint passed." : "Spec is valid.");
     return;
   }
 
@@ -89,6 +129,23 @@ async function main(): Promise<void> {
   }
 
   if (args.command === "proof") {
+    if (args.positionals[0] === "diff") {
+      const baselinePath = getString(args.flags, "baseline");
+      const candidatePath = getString(args.flags, "candidate");
+      if (!baselinePath || !candidatePath) {
+        console.error("proof diff requires --baseline <proof.json> and --candidate <proof.json>.");
+        process.exitCode = 1;
+        return;
+      }
+
+      const baseline = await readJson<ProofReport>(path.resolve(baselinePath));
+      const candidate = await readJson<ProofReport>(path.resolve(candidatePath));
+      const diff = diffProofReports(baseline, candidate);
+      console.log(renderProofDiff(diff));
+      if (!diff.ok && !getBoolean(args.flags, "allow-differences")) process.exitCode = 1;
+      return;
+    }
+
     const spec = await loadSpec(args.flags);
     const dataDir = path.resolve(getString(args.flags, "data", "demo-data") ?? "demo-data");
     const markdownOut = getString(args.flags, "out", path.join(dataDir, "proof.md"));
@@ -122,13 +179,17 @@ Usage:
   dds doctor --agent auto
   dds init --project .
   dds init --pack field-service --project .
+  dds pack list
+  dds pack export --pack field-service --out field-service.simulator.spec.json
   dds infer --agent codex --project .
   dds infer --agent codex --project . --profile fast
   dds infer --agent claude --project .
   dds infer --agent command --agent-cmd node --agent-arg examples/agents/field-service-agent.mjs --project .
   dds validate --spec simulator.spec.json
+  dds lint --spec simulator.spec.json
   dds generate --spec simulator.spec.json --seed 42 --out demo-data
   dds proof --spec simulator.spec.json --data demo-data --out demo-data/proof.md
+  dds proof diff --baseline proof-before.json --candidate proof-after.json
   dds explain --spec simulator.spec.json
 `);
 }

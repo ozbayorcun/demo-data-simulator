@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { getScenarioPack } from "./packs.js";
 import { normalizeSpec, validateSpec } from "./spec.js";
 import type { SimulatorSpec } from "./types.js";
 
@@ -100,6 +101,77 @@ describe("validateSpec", () => {
 
     expect(result.ok).toBe(true);
     expect(result.warnings).toEqual([]);
+  });
+
+  it("accepts built-in scenario pack effect targets", () => {
+    const spec = getScenarioPack("field-service")?.spec;
+
+    expect(spec).toBeDefined();
+    expect(validateSpec(spec).ok).toBe(true);
+  });
+
+  it("rejects broken scenario effect targets", () => {
+    const result = validateSpec({
+      ...validSpec,
+      metrics: [{ name: "tickets", expression: "count(ticket_created)", dependsOn: ["ticket_created"] }],
+      scenarios: [
+        {
+          name: "broken-targets",
+          startsOnDay: 1,
+          endsOnDay: 2,
+          effects: [
+            { target: "entity:ticket.status=closed" },
+            { target: "event:ticket_missing" },
+            { target: "metric:tickets" },
+            { target: "entity:missing.priority=high" },
+            { target: "entity:ticket.priority=urgent" },
+            { target: "entity:ticket.priority=high", metric: "missing_metric", multiplier: 0 },
+          ],
+        },
+      ],
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.join("\n")).toContain("missing field ticket.status");
+    expect(result.errors.join("\n")).toContain("missing event ticket_missing");
+    expect(result.errors.join("\n")).toContain("must use event:<name> or entity:<entity>.<field>=<value>");
+    expect(result.errors.join("\n")).toContain("missing entity missing");
+    expect(result.errors.join("\n")).toContain("unsupported enum value ticket.priority=urgent");
+    expect(result.errors.join("\n")).toContain("missing metric missing_metric");
+    expect(result.errors.join("\n")).toContain("multiplier must be a positive number");
+  });
+
+  it("treats nullable scenario windows and effect options as absent", () => {
+    const result = validateSpec({
+      ...validSpec,
+      metrics: [{ name: "tickets", expression: "count(ticket_created)", dependsOn: ["ticket_created"] }],
+      scenarios: [
+        {
+          name: "schema-null-options",
+          startsOnDay: null,
+          endsOnDay: null,
+          effects: [{ target: "event:ticket_created", metric: null, multiplier: null }],
+        },
+      ],
+    } as unknown as SimulatorSpec);
+
+    expect(result.errors).toEqual([]);
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects invalid scenario windows", () => {
+    const result = validateSpec({
+      ...validSpec,
+      defaults: { days: 7 },
+      scenarios: [
+        { name: "backwards", startsOnDay: 5, endsOnDay: 2 },
+        { name: "too-long", startsOnDay: 1, endsOnDay: 10 },
+      ],
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.join("\n")).toContain("startsOnDay must be <= endsOnDay");
+    expect(result.errors.join("\n")).toContain("endsOnDay must be <= defaults.days (7)");
   });
 });
 

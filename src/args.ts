@@ -1,15 +1,20 @@
 export interface ParsedArgs {
   command: string;
+  positionals: string[];
   flags: Record<string, string | boolean | string[]>;
 }
 
 export function parseArgs(argv: string[]): ParsedArgs {
   const [command = "help", ...rest] = argv;
   const flags: Record<string, string | boolean | string[]> = {};
+  const positionals: string[] = [];
 
   for (let index = 0; index < rest.length; index += 1) {
     const token = rest[index];
-    if (!token.startsWith("--")) continue;
+    if (!token.startsWith("--")) {
+      positionals.push(token);
+      continue;
+    }
     const key = token.slice(2);
     const next = rest[index + 1];
     const value = next && !next.startsWith("--") ? next : true;
@@ -23,7 +28,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
     }
   }
 
-  return { command, flags };
+  return { command, positionals, flags };
 }
 
 export function getString(flags: ParsedArgs["flags"], key: string, fallback?: string): string | undefined {
