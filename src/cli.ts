@@ -98,7 +98,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  if (args.command === "validate") {
+  if (args.command === "validate" || args.command === "lint") {
     const spec = await loadSpec(args.flags);
     const result = validateSpec(spec);
     for (const warning of result.warnings) console.warn(`WARN ${warning}`);
@@ -107,7 +107,7 @@ async function main(): Promise<void> {
       process.exitCode = 1;
       return;
     }
-    console.log("Spec is valid.");
+    console.log(args.command === "lint" ? "Spec lint passed." : "Spec is valid.");
     return;
   }
 
@@ -167,6 +167,7 @@ Usage:
   dds infer --agent claude --project .
   dds infer --agent command --agent-cmd node --agent-arg examples/agents/field-service-agent.mjs --project .
   dds validate --spec simulator.spec.json
+  dds lint --spec simulator.spec.json
   dds generate --spec simulator.spec.json --seed 42 --out demo-data
   dds proof --spec simulator.spec.json --data demo-data --out demo-data/proof.md
   dds explain --spec simulator.spec.json
