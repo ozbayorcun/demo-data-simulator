@@ -75,7 +75,16 @@ dds proof diff \
 
 ## Full Local Smoke
 
-Run the pack proof smoke before merging scenario pack changes:
+Run the authoring gates smoke before merging scenario pack authoring changes:
+
+```bash
+npm run smoke:authoring-gates
+```
+
+That command builds the CLI, then verifies pack listing/exporting, lint,
+generation, proof reports, matching proof diffs, and expected proof drift.
+
+Run the broader pack proof smoke when changing built-in pack contents:
 
 ```bash
 npm run smoke:scenario-proof
