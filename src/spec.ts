@@ -245,6 +245,8 @@ export function validateSpec(value: unknown): ValidationResult {
     }
   }
 
+  errors.push(...validateScenarios(spec as Partial<SimulatorSpec>, entityNames, eventNames));
+
   for (const format of spec.outputs?.formats ?? []) {
     if (!["csv", "jsonl", "manifest", "sql"].includes(format)) {
       errors.push(`Unsupported output format ${String(format)}.`);
@@ -252,6 +254,100 @@ export function validateSpec(value: unknown): ValidationResult {
   }
 
   return { ok: errors.length === 0, errors, warnings };
+}
+
+function validateScenarios(
+  spec: Partial<SimulatorSpec>,
+  entityNames: Set<string>,
+  eventNames: Set<string>,
+): string[] {
+  const errors: string[] = [];
+  const scenarioNames = new Set<string>();
+  const metricNames = new Set((spec.metrics ?? []).map((metric) => metric.name).filter(isNonEmptyString));
+
+  for (const scenario of spec.scenarios ?? []) {
+    if (!isNonEmptyString(scenario.name)) {
+      errors.push("Every scenario needs a name.");
+      continue;
+    }
+    if (scenarioNames.has(scenario.name)) errors.push(`Duplicate scenario: ${scenario.name}.`);
+    scenarioNames.add(scenario.name);
+
+    const startsOnDay = scenario.startsOnDay;
+    const endsOnDay = scenario.endsOnDay;
+    if (startsOnDay !== undefined && (!Number.isInteger(startsOnDay) || startsOnDay < 1)) {
+      errors.push(`Scenario ${scenario.name} startsOnDay must be an integer >= 1.`);
+    }
+    if (endsOnDay !== undefined && (!Number.isInteger(endsOnDay) || endsOnDay < 1)) {
+      errors.push(`Scenario ${scenario.name} endsOnDay must be an integer >= 1.`);
+    }
+    if (
+      typeof startsOnDay === "number" &&
+      typeof endsOnDay === "number" &&
+      Number.isInteger(startsOnDay) &&
+      Number.isInteger(endsOnDay) &&
+      startsOnDay > endsOnDay
+    ) {
+      errors.push(`Scenario ${scenario.name} startsOnDay must be <= endsOnDay.`);
+    }
+    if (
+      typeof endsOnDay === "number" &&
+      Number.isInteger(endsOnDay) &&
+      spec.defaults?.days !== undefined &&
+      endsOnDay > spec.defaults.days
+    ) {
+      errors.push(`Scenario ${scenario.name} endsOnDay must be <= defaults.days (${spec.defaults.days}).`);
+    }
+
+    for (const effect of scenario.effects ?? []) {
+      if (!isNonEmptyString(effect.target)) {
+        errors.push(`Scenario ${scenario.name} has an effect without a target.`);
+      } else {
+        errors.push(...validateScenarioEffectTarget(scenario.name, effect.target, spec, entityNames, eventNames));
+      }
+      if (effect.metric !== undefined && !metricNames.has(effect.metric)) {
+        errors.push(`Scenario ${scenario.name} effect references missing metric ${effect.metric}.`);
+      }
+      if (effect.multiplier !== undefined && (typeof effect.multiplier !== "number" || effect.multiplier <= 0)) {
+        errors.push(`Scenario ${scenario.name} effect multiplier must be a positive number.`);
+      }
+    }
+  }
+
+  return errors;
+}
+
+function validateScenarioEffectTarget(
+  scenarioName: string,
+  target: string,
+  spec: Partial<SimulatorSpec>,
+  entityNames: Set<string>,
+  eventNames: Set<string>,
+): string[] {
+  if (target.startsWith("event:")) {
+    const eventName = target.slice("event:".length);
+    return eventNames.has(eventName) ? [] : [`Scenario ${scenarioName} effect references missing event ${eventName}.`];
+  }
+
+  const entityMatch = /^entity:([^.]+)\.([^=]+)=(.+)$/.exec(target);
+  if (!entityMatch) {
+    return [`Scenario ${scenarioName} effect target ${target} must use event:<name> or entity:<entity>.<field>=<value>.`];
+  }
+
+  const [, entityName, fieldName, expectedValue] = entityMatch;
+  if (!entityNames.has(entityName)) {
+    return [`Scenario ${scenarioName} effect references missing entity ${entityName}.`];
+  }
+
+  const entity = spec.entities?.find((candidate) => candidate.name === entityName);
+  const field = entity?.fields.find((candidate) => candidate.name === fieldName);
+  if (!field) {
+    return [`Scenario ${scenarioName} effect references missing field ${entityName}.${fieldName}.`];
+  }
+  if (field.type === "enum" && field.values && !field.values.includes(expectedValue)) {
+    return [`Scenario ${scenarioName} effect references unsupported enum value ${entityName}.${fieldName}=${expectedValue}.`];
+  }
+  return [];
 }
 
 function isValidDateString(value: string): boolean {
