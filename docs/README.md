@@ -7,6 +7,7 @@ records. The README remains the primary user guide.
 
 - `release-runbook.md` - npm release process and trusted-publishing setup notes.
 - `pre-publish-proof-bundle.md` - local proof bundle for public package readiness.
+- `scenario-pack-authoring-quality-gates.md` - local pack authoring, lint, proof, and proof-diff workflow.
 - `scenario-packs-proof-reports-plan.md` - next feature plan for scenario packs and proof reports.
 - `scenario-pack-gallery-m031-audit.md` - M031 gallery milestone audit and local proof commands.
 

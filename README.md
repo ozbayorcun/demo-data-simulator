@@ -76,6 +76,7 @@ Recommended first-run commands:
 
 ```bash
 npx demo-data-simulator init --pack sales-pipeline --project .
+npx demo-data-simulator lint --spec simulator.spec.json
 npx demo-data-simulator generate --spec simulator.spec.json --seed sales-demo --out demo-data
 npx demo-data-simulator proof --spec simulator.spec.json --data demo-data --out demo-data/proof.md
 ```
@@ -98,6 +99,17 @@ Outputs:
 For a quick visual proof, see the synthetic field-service dashboard example in
 `examples/field-service/dashboard/`. It reads generated `events.jsonl` and
 `metrics_daily.csv` files, and stays entirely local.
+
+To inspect or review packs before generation:
+
+```bash
+npx demo-data-simulator pack list
+npx demo-data-simulator pack export --pack field-service --out field-service.simulator.spec.json
+npx demo-data-simulator lint --spec field-service.simulator.spec.json
+```
+
+For maintainer pack authoring gates, including proof JSON diffing, see
+`docs/scenario-pack-authoring-quality-gates.md`.
 
 ## Public Repo Guide
 
@@ -232,12 +244,18 @@ trusted publishing setup, see `docs/release-runbook.md`.
 ```bash
   dds doctor --agent auto
   dds init --project .
+  dds init --pack field-service --project .
+  dds pack list
+  dds pack export --pack field-service --out field-service.simulator.spec.json
   dds infer --agent codex --project .
   dds infer --agent codex --project . --profile fast
   dds infer --agent claude --project .
   dds infer --agent command --agent-cmd <bin> --agent-arg <arg> --project .
   dds validate --spec simulator.spec.json
+  dds lint --spec simulator.spec.json
   dds generate --spec simulator.spec.json --seed 42 --out demo-data
+  dds proof --spec simulator.spec.json --data demo-data --out demo-data/proof.md
+  dds proof diff --baseline proof-before.json --candidate proof-after.json
   dds explain --spec simulator.spec.json
 ```
 
